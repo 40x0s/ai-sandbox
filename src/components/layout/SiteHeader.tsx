@@ -1,5 +1,7 @@
 import Link from 'next/link'
-import { BagIcon, SearchIcon, UserIcon } from '@/components/ui/icons'
+import { BagIcon, SearchIcon } from '@/components/ui/icons'
+import { AccountNav } from './AccountNav'
+import { CartCount } from './CartCount'
 
 const primaryNav = [
   { label: 'Women', href: '/catalog?category=women' },
@@ -48,20 +50,14 @@ export function SiteHeader() {
             >
               <SearchIcon className="h-5 w-5" />
             </Link>
-            <Link
-              href="/login"
-              aria-label="Sign in"
-              className="rounded-full p-2.5 text-ink-soft transition-colors hover:bg-bone-100 hover:text-ink"
-            >
-              <UserIcon className="h-5 w-5" />
-            </Link>
+            <AccountNav />
             <Link
               href="/cart"
               aria-label="View cart"
               className="relative rounded-full p-2.5 text-ink-soft transition-colors hover:bg-bone-100 hover:text-ink"
             >
               <BagIcon className="h-5 w-5" />
-              {/* Cart count badge is wired to the cart context in the cart step. */}
+              <CartCount />
             </Link>
           </div>
         </div>
