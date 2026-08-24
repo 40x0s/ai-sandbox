@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 /**
@@ -23,6 +23,29 @@ export type Session = {
   role: Role
 }
 
+/**
+ * Cookie attributes depend on how the app is being served.
+ *
+ * A `SameSite=Lax` cookie is NOT sent on cross-site subresource requests, which
+ * is exactly what happens when the storefront is embedded in a preview iframe on
+ * another domain — login succeeds, the cookie is issued, and then every later
+ * request arrives without it. Over HTTPS we therefore use `SameSite=None;
+ * Secure` (the Secure flag is mandatory for None). Plain http://localhost keeps
+ * the stricter `Lax`, since browsers reject `None` without `Secure`.
+ */
+async function sessionCookieFlags() {
+  const requestHeaders = await headers()
+  const forwardedProto = (requestHeaders.get('x-forwarded-proto') ?? '').split(',')[0].trim()
+  const host = requestHeaders.get('host') ?? ''
+
+  const secure =
+    process.env.NODE_ENV === 'production' ||
+    forwardedProto === 'https' ||
+    host.endsWith('.e2b.app') // sandbox live-preview proxy
+
+  return { secure, sameSite: secure ? ('none' as const) : ('lax' as const) }
+}
+
 export async function createSession(session: Session): Promise<void> {
   const token = await new SignJWT({
     email: session.email,
@@ -35,11 +58,12 @@ export async function createSession(session: Session): Promise<void> {
     .setExpirationTime(`${SESSION_MAX_AGE}s`)
     .sign(secret)
 
+  const { secure, sameSite } = await sessionCookieFlags()
   const store = await cookies()
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    secure,
     path: '/',
     maxAge: SESSION_MAX_AGE,
   })
