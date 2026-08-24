@@ -1145,6 +1145,7 @@ export type ColorCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * The data used to create many Colors.
    */
   data: Prisma.ColorCreateManyInput | Prisma.ColorCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1163,6 +1164,7 @@ export type ColorCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extension
    * The data used to create many Colors.
    */
   data: Prisma.ColorCreateManyInput | Prisma.ColorCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**

@@ -1,6 +1,9 @@
 import type { MetadataRoute } from 'next'
 import { getAllProductSlugs } from '@/lib/products'
 
+// Regenerated per request so new products appear without a rebuild.
+export const dynamic = 'force-dynamic'
+
 const BASE = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

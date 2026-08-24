@@ -32,27 +32,30 @@ Everything in the feature list below is implemented and verified end-to-end
 `node_modules/` and `prisma/dev.db` are **not** in the repository, so a fresh copy needs four
 commands. Requires **Node.js ≥ 20.9** (`node -v`).
 
+Two terminals:
+
 ```bash
-cd <the-folder>
-npm install                 # ~20s
-cp .env.example .env        # DATABASE_URL + AUTH_SECRET
-npm run db:setup            # creates prisma/dev.db, applies the migration, seeds 7 products
+# Terminal 1 — local PostgreSQL (PGlite, nothing to install)
+npm install
+cp .env.example .env
+npm run db:serve            # postgresql://postgres:postgres@127.0.0.1:5433/postgres
+
+# Terminal 2 — the app
+npm run db:setup            # applies the migration and seeds 7 products
 npm run dev                 # → http://localhost:3000
 ```
+
+Prefer a real PostgreSQL? Start one however you like and point `DATABASE_URL`
+at it — nothing else in the app changes.
 
 Sign in as `admin@store.test` / `admin123` to reach `/admin`.
 
 Seeded coupons: `WELCOME10` (10%), `ATELIER20` (20%, 100 uses), `EXPIRED5` (inactive).
 
-If `npm run db:setup` fails with an error mentioning **binaries.prisma.sh**, your network is
-blocking Prisma's engine download — use the fallback instead (same SQL, same result):
-
-```bash
-npm run db:setup:offline
-```
-
-If your copy already contains `prisma/dev.db` (e.g. you copied the whole directory rather than
-cloning), skip the database step and just run `npm install && npm run dev`.
+`npm run db:setup` applies `prisma/migrations/*/migration.sql` over the wire, so it needs no
+Prisma engine download and works on networks that block `binaries.prisma.sh`. Applied migrations
+are recorded in `_applied_migrations`, which makes it safe to re-run; `--baseline` records an
+existing database without executing anything.
 
 Production build:
 
@@ -87,13 +90,14 @@ npm run dev                           # http://localhost:3000
 | --- | --- |
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run lint` / `typecheck` | ESLint · `tsc --noEmit` |
+| `npm run db:serve` | Local PostgreSQL (PGlite) on port 5433 |
 | `npm run db:generate` | Regenerate the Prisma Client after schema changes |
-| `npm run db:migrate` / `db:deploy` | Create / apply migrations |
+| `npm run db:migrate` | `prisma migrate dev` (needs network for the Prisma engine) |
+| `npm run db:deploy` | Apply committed migrations over the wire (no engine needed) |
 | `npm run db:seed` | Seed demo data (idempotent) |
 | `npm run db:studio` | Prisma Studio |
-| `npm run db:setup` | Migrate + seed |
-| `npm run db:setup:offline` | Same, but applies the committed SQL without the Prisma CLI |
-| `bash scripts/e2e.sh` | End-to-end smoke test — 67 assertions against a running dev server |
+| `npm run db:setup` | Apply migrations + seed |
+| `npm test` | End-to-end smoke test — 67 assertions against a running dev server |
 
 ## 3. Demo accounts
 
@@ -219,7 +223,7 @@ reason; regenerate it with `npm run db:generate` after schema changes.
 
 | # | Item | Why / what to do |
 | --- | --- | --- |
-| 1 | **SQLite file storage** | A file on disk does not survive serverless/ephemeral filesystems (Vercel, Lambda). Move to Postgres: change the datasource provider and use `@prisma/adapter-pg`, then `prisma migrate dev`. Or deploy on a VM/container with a persistent volume. |
+| 1 | ~~SQLite file storage~~ **done** | The app runs on PostgreSQL through `@prisma/adapter-pg`. Local dev uses PGlite (`npm run db:serve`); production points `DATABASE_URL` at Neon/Supabase/RDS. Serverless-safe. |
 | 2 | **`AUTH_SECRET`** | Must be your own 32+ character value (`openssl rand -base64 32`). Verified: with the placeholder the login route fails closed with HTTP 500. |
 | 3 | **Admin password** | The seed creates `admin@store.test / admin123`. Change or remove it. |
 | 4 | **Payments** | Checkout is a simulation — no provider is called. Integrate Stripe/Paymob/etc. before charging anyone. |
@@ -230,31 +234,56 @@ reason; regenerate it with `npm run db:generate` after schema changes.
 | 9 | **`NEXT_PUBLIC_SITE_URL`** | Set it to the real domain, otherwise Open Graph image URLs point at localhost. |
 | 10 | **Product images** | Served from `public/images`. Real catalogs need object storage + a CDN and an upload flow. |
 
-### Deploying with Docker (SQLite on a persistent volume)
+### Deploying to Vercel
 
-Works on any container host with real storage — Fly.io, Railway, Render, a VPS.
-**Not** on serverless (ephemeral filesystem).
+1. Create a PostgreSQL database — [Neon](https://neon.tech) or
+   [Supabase](https://supabase.com) both have free tiers. Copy the pooled
+   connection string.
+2. Push this repository to GitHub and import it in Vercel.
+3. Set the environment variables in **Project → Settings → Environment Variables**:
+
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | `postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require` |
+   | `AUTH_SECRET` | output of `openssl rand -base64 32` |
+   | `NEXT_PUBLIC_SITE_URL` | your production URL |
+
+4. Apply the schema once, from your machine (deploy migrations deliberately
+   rather than during the Vercel build):
+
+   ```bash
+   export DATABASE_URL="postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require"
+   npm run db:deploy
+   npm run db:seed          # optional demo catalogue
+   ```
+5. Deploy. Do **not** set `ALLOW_IFRAME_EMBED`, so the build ships
+   `X-Frame-Options: DENY` and `frame-ancestors 'none'`.
+
+Notes: `?sslmode=require` is required by Neon and Supabase. Use the *pooled*
+connection string (port 6543 on Neon, `-pooler` host on Supabase) because
+serverless functions open many short-lived connections.
+
+### Deploying with Docker
 
 ```bash
 export AUTH_SECRET="$(openssl rand -base64 32)"
 docker compose up --build          # http://localhost:3000
 ```
 
-The image runs `db:setup:offline` on every start; applied migrations are recorded
-in `_applied_migrations`, so restarts are safe. The SQLite file lives in the
-`atelier-data` volume at `/app/data/atelier.db`.
+`docker-compose.yml` starts `postgres:16-alpine` with a named volume plus the
+app; the image runs `db:deploy` on every start and `_applied_migrations` makes
+that idempotent.
 
-Bare metal / VM instead:
+Bare metal / VM:
 
 ```bash
 npm ci
-cp .env.example .env      # then set AUTH_SECRET and NEXT_PUBLIC_SITE_URL
-npm run db:setup          # or db:setup:offline where binaries.prisma.sh is blocked
+cp .env.example .env      # then set DATABASE_URL, AUTH_SECRET, NEXT_PUBLIC_SITE_URL
+npm run db:setup
 npm run build && npm start
 ```
 
-Required environment: `DATABASE_URL`, `AUTH_SECRET`, `NEXT_PUBLIC_SITE_URL`.
-See `.env.production.example`.
+See `.env.production.example` for the full variable list.
 
 ### Payments
 

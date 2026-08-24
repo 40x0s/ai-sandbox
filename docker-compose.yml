@@ -1,16 +1,31 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: atelier
+      POSTGRES_PASSWORD: atelier
+      POSTGRES_DB: atelier
+    volumes:
+      - atelier-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U atelier -d atelier']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   storefront:
     build: .
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - '3000:3000'
     environment:
+      DATABASE_URL: postgresql://atelier:atelier@db:5432/atelier
       # Generate with: openssl rand -base64 32
       AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET in your shell or a .env file (openssl rand -base64 32)}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
-      DATABASE_URL: file:/app/data/atelier.db
-    volumes:
-      - atelier-data:/app/data
     restart: unless-stopped
 
 volumes:
-  atelier-data:
+  atelier-pgdata:

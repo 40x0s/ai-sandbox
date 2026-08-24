@@ -6,14 +6,16 @@ cd "$(dirname "$0")/.."
 rm -f /tmp/*.jar /tmp/*.json
 
 pass=0; fail=0
+dbq() { npx tsx scripts/db-query.mts "$1" 2>/dev/null; }
+
 check() { # check <label> <expected> <actual>
   if [ "$2" = "$3" ]; then printf "  PASS  %-46s %s\n" "$1" "$3"; pass=$((pass+1))
   else printf "  FAIL  %-46s expected=%s actual=%s\n" "$1" "$2" "$3"; fail=$((fail+1)); fi
 }
 
-CATID=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(d.prepare(\"SELECT id FROM Category WHERE slug='women'\").get().id)" 2>/dev/null)
-TEEPID=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(d.prepare(\"SELECT id FROM Product WHERE slug='essential-cotton-tee'\").get().id)" 2>/dev/null)
-STOCK_BEFORE=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT stock FROM Product WHERE slug='essential-cotton-tee'\").get().stock))" 2>/dev/null)
+CATID=$(dbq 'SELECT id FROM "Category" WHERE slug=$$women$$')
+TEEPID=$(dbq 'SELECT id FROM "Product" WHERE slug=$$essential-cotton-tee$$')
+STOCK_BEFORE=$(dbq 'SELECT stock FROM "Product" WHERE slug=$$essential-cotton-tee$$')
 
 echo "=== AUTH GUARDS ==="
 check "GET /admin unauthenticated -> 307" "307" "$(curl -s -o /dev/null -w '%{http_code}' $B/admin)"
@@ -81,8 +83,8 @@ curl -s "$B/catalog?category=kids&size=XL" -o /tmp/f3.html
 check "?category=kids&size=XL -> empty state" "true" "$(grep -qF 'No products match those filters' /tmp/f3.html && echo true || echo false)"
 
 echo "=== CHECKOUT ==="
-ORDERS_BEFORE=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare('SELECT COUNT(*) AS c FROM \"Order\"').get().c))" 2>/dev/null)
-ITEMS_BEFORE=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare('SELECT COUNT(*) AS c FROM OrderItem').get().c))" 2>/dev/null)
+ORDERS_BEFORE=$(dbq 'SELECT count(*) FROM "Order"')
+ITEMS_BEFORE=$(dbq 'SELECT count(*) FROM "OrderItem"')
 cat > /tmp/order.json <<JSON
 {"email":"$EMAIL","fullName":"E2E Buyer","address":"12 Test Street","city":"Riyadh",
  "postcode":"12345","country":"Saudi Arabia",
@@ -94,11 +96,11 @@ check "place order -> 201" "201" "$CODE"
 ORDERID=$(node -e "try{process.stdout.write(require('/tmp/order-res.json').orderId)}catch{}" 2>/dev/null)
 check "order total = 2 x \$32 = \$64 -> 6400 + shipping 695 = 7095" "7095" \
   "$(node -e "try{process.stdout.write(String(require('/tmp/order-res.json').total))}catch{}" 2>/dev/null)"
-STOCK_AFTER=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT stock FROM Product WHERE slug='essential-cotton-tee'\").get().stock))" 2>/dev/null)
+STOCK_AFTER=$(dbq 'SELECT stock FROM "Product" WHERE slug=$$essential-cotton-tee$$')
 check "stock decremented by 2 ($STOCK_BEFORE -> $STOCK_AFTER)" "$((STOCK_BEFORE-2))" "$STOCK_AFTER"
-ORDERS_AFTER=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare('SELECT COUNT(*) AS c FROM \"Order\"').get().c))" 2>/dev/null)
+ORDERS_AFTER=$(dbq 'SELECT count(*) FROM "Order"')
 check "one new order row persisted ($ORDERS_BEFORE -> $ORDERS_AFTER)" "$((ORDERS_BEFORE+1))" "$ORDERS_AFTER"
-ITEMS_AFTER=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare('SELECT COUNT(*) AS c FROM OrderItem').get().c))" 2>/dev/null)
+ITEMS_AFTER=$(dbq 'SELECT count(*) FROM "OrderItem"')
 check "one new order line persisted ($ITEMS_BEFORE -> $ITEMS_AFTER)" "$((ITEMS_BEFORE+1))" "$ITEMS_AFTER"
 curl -s "$B/checkout/success?id=$ORDERID" -o /tmp/success.html
 check "success page -> 200 + shows order" "true" \
@@ -110,7 +112,7 @@ check "quantity 9999 -> 422 (validator cap)" "422" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/orders -H 'Content-Type: application/json' \
      -d "{\"email\":\"$EMAIL\",\"fullName\":\"E2E Buyer\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"lines\":[{\"productId\":\"$TEEPID\",\"size\":\"M\",\"color\":\"White\",\"quantity\":9999}]}")"
 # a valid quantity that still exceeds available stock must be a conflict
-HOODIEPID=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(d.prepare(\"SELECT id FROM Product WHERE slug='little-explorer-hoodie'\").get().id)" 2>/dev/null)
+HOODIEPID=$(dbq 'SELECT id FROM "Product" WHERE slug=$$little-explorer-hoodie$$')
 check "quantity 99 > stock 76 -> 409" "409" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/orders -H 'Content-Type: application/json' \
      -d "{\"email\":\"$EMAIL\",\"fullName\":\"E2E Buyer\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"lines\":[{\"productId\":\"$HOODIEPID\",\"size\":\"4Y\",\"color\":\"Mustard\",\"quantity\":99}]}")"
@@ -122,8 +124,8 @@ check "empty bag -> 422" "422" \
      -d '{"email":"a@b.com","fullName":"A B","address":"12 Test St","city":"Riyadh","postcode":"1","country":"KSA","lines":[]}')"
 
 echo "=== STOCK RACE (two concurrent orders for the last unit) ==="
-HOODIE=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(d.prepare(\"SELECT id FROM Product WHERE slug='little-explorer-hoodie'\").get().id)" 2>/dev/null)
-node -e "const{DatabaseSync}=require('node:sqlite');new DatabaseSync('prisma/dev.db').prepare(\"UPDATE Product SET stock=1 WHERE slug='little-explorer-hoodie'\").run()" 2>/dev/null
+HOODIE=$(dbq 'SELECT id FROM "Product" WHERE slug=$$little-explorer-hoodie$$')
+dbq 'UPDATE "Product" SET stock=1 WHERE slug=$$little-explorer-hoodie$$' > /dev/null
 RACE="{\"email\":\"$EMAIL\",\"fullName\":\"Race Buyer\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"lines\":[{\"productId\":\"$HOODIE\",\"size\":\"4Y\",\"color\":\"Mustard\",\"quantity\":1}]}"
 curl -s -o /tmp/r1.json -w "%{http_code}" -X POST $B/api/orders -H 'Content-Type: application/json' -d "$RACE" > /tmp/r1.code &
 curl -s -o /tmp/r2.json -w "%{http_code}" -X POST $B/api/orders -H 'Content-Type: application/json' -d "$RACE" > /tmp/r2.code &
@@ -133,16 +135,16 @@ OK201=$(echo "$CODES" | tr ' ' '\n' | grep -c '^201$')
 OK409=$(echo "$CODES" | tr ' ' '\n' | grep -c '^409$')
 check "exactly one order wins (201)" "1" "$OK201"
 check "the other is rejected (409)" "1" "$OK409"
-FINAL_STOCK=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT stock FROM Product WHERE slug='little-explorer-hoodie'\").get().stock))" 2>/dev/null)
+FINAL_STOCK=$(dbq 'SELECT stock FROM "Product" WHERE slug=$$little-explorer-hoodie$$')
 check "stock ends at 0, never negative" "0" "$FINAL_STOCK"
-node -e "const{DatabaseSync}=require('node:sqlite');new DatabaseSync('prisma/dev.db').prepare(\"UPDATE Product SET stock=76 WHERE slug='little-explorer-hoodie'\").run()" 2>/dev/null
+dbq 'UPDATE "Product" SET stock=76 WHERE slug=$$little-explorer-hoodie$$' > /dev/null
 
 echo "=== GALLERY + REVIEWS ==="
 curl -s "$B/products/cable-knit-sweater" -o /tmp/pdp2.html
 check "PDP shows 2 gallery images" "2" "$(grep -o 'Show image [0-9]' /tmp/pdp2.html | sort -u | wc -l | tr -d ' ')"
 check "PDP embeds JSON-LD Product schema" "true" "$(grep -qF 'application/ld+json' /tmp/pdp2.html && grep -qF 'AggregateRating' /tmp/pdp2.html && echo true || echo false)"
 check "PDP lists seeded reviews" "true" "$(grep -qF 'Heavy, warm, no bobbling' /tmp/pdp2.html && echo true || echo false)"
-SWEATER=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(d.prepare(\"SELECT id FROM Product WHERE slug='cable-knit-sweater'\").get().id)" 2>/dev/null)
+SWEATER=$(dbq 'SELECT id FROM "Product" WHERE slug=$$cable-knit-sweater$$')
 check "POST review -> 201" "201" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/reviews -H 'Content-Type: application/json' -d "{\"productId\":\"$SWEATER\",\"author\":\"E2E Tester\",\"rating\":5,\"title\":\"Great knit\",\"body\":\"Arrived quickly and the wool is much softer than expected.\"}")"
 check "review body too short -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/reviews -H 'Content-Type: application/json' -d "{\"productId\":\"$SWEATER\",\"author\":\"E2E Tester\",\"rating\":5,\"body\":\"short\"}")"
 check "review rating 9 -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/reviews -H 'Content-Type: application/json' -d "{\"productId\":\"$SWEATER\",\"author\":\"E2E Tester\",\"rating\":9,\"body\":\"A perfectly reasonable length of review text.\"}")"
@@ -154,11 +156,11 @@ check "unknown code -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X P
 check "inactive code -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/coupons -H 'Content-Type: application/json' -d '{"code":"EXPIRED5","subtotal":6400}')"
 
 echo "=== ORDER WITH COUPON ==="
-USED_BEFORE=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT usedCount FROM Coupon WHERE code='WELCOME10'\").get().usedCount))" 2>/dev/null)
+USED_BEFORE=$(dbq 'SELECT "usedCount" FROM "Coupon" WHERE code=$$WELCOME10$$')
 curl -s -o /tmp/coupon-order.json -w "%{http_code}" -b /tmp/buyer.jar -X POST $B/api/orders -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"fullName\":\"Coupon Buyer\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"couponCode\":\"WELCOME10\",\"lines\":[{\"productId\":\"$TEEPID\",\"size\":\"M\",\"color\":\"White\",\"quantity\":2}]}" > /tmp/coupon-order.code
 check "order with coupon -> 201" "201" "$(cat /tmp/coupon-order.code)"
 check "total = 6400 - 640 + 695 shipping = 6455" "6455" "$(node -e "try{process.stdout.write(String(require('/tmp/coupon-order.json').total))}catch{process.stdout.write('ERR')}")"
-USED_AFTER=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT usedCount FROM Coupon WHERE code='WELCOME10'\").get().usedCount))" 2>/dev/null)
+USED_AFTER=$(dbq 'SELECT "usedCount" FROM "Coupon" WHERE code=$$WELCOME10$$')
 check "coupon usage counted ($USED_BEFORE -> $USED_AFTER)" "$((USED_BEFORE+1))" "$USED_AFTER"
 check "bogus coupon on order -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/orders -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"fullName\":\"C B\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"couponCode\":\"FAKECODE\",\"lines\":[{\"productId\":\"$TEEPID\",\"size\":\"M\",\"color\":\"White\",\"quantity\":1}]}")"
 

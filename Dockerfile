@@ -1,9 +1,8 @@
-# ATELIER storefront — production image.
+# ATELIER storefront — production image (PostgreSQL).
 #
-# SQLite lives on a named volume (/app/data), so this image is safe to run on
-# any container host with persistent storage (Fly.io, Railway, Render, a VPS).
-# It is NOT suitable for serverless platforms, whose filesystems are ephemeral —
-# there, move to Postgres (see README "Production readiness").
+# The app talks to PostgreSQL over the wire, so this image is stateless and
+# works on any container platform. Point DATABASE_URL at your database
+# (see docker-compose.yml for a local postgres service).
 
 FROM node:22-alpine
 
@@ -20,14 +19,10 @@ RUN npm run build
 
 ENV NODE_ENV=production \
     PORT=3000 \
-    HOSTNAME=0.0.0.0 \
-    DATABASE_URL="file:/app/data/atelier.db"
-
-RUN mkdir -p /app/data
-VOLUME ["/app/data"]
+    HOSTNAME=0.0.0.0
 
 EXPOSE 3000
 
-# AUTH_SECRET must be supplied at runtime (the app refuses to sign sessions
-# with the placeholder value in production).
-CMD ["sh", "-c", "npm run db:setup:offline && npm start"]
+# AUTH_SECRET and DATABASE_URL must be supplied at runtime. The app refuses to
+# sign sessions with the placeholder secret in production.
+CMD ["sh", "-c", "npm run db:deploy && npm start"]

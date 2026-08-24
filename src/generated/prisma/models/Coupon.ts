@@ -1132,6 +1132,7 @@ export type CouponCreateManyArgs<ExtArgs extends runtime.Types.Extensions.Intern
    * The data used to create many Coupons.
    */
   data: Prisma.CouponCreateManyInput | Prisma.CouponCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
@@ -1150,6 +1151,7 @@ export type CouponCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensio
    * The data used to create many Coupons.
    */
   data: Prisma.CouponCreateManyInput | Prisma.CouponCreateManyInput[]
+  skipDuplicates?: boolean
 }
 
 /**
