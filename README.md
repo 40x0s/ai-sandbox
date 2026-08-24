@@ -285,10 +285,35 @@ npm run build && npm start
 
 See `.env.production.example` for the full variable list.
 
-### Payments
+### Payments (Stripe)
 
-`src/lib/payments.ts` is the only place that touches payment. It is a simulation
-today: with `PAYMENTS_MODE=live` it fails closed with HTTP 402 rather than
-marking an unpaid order as paid. Implement the `live` branch (Stripe, Paymob,
-Checkout.com…) and nothing else has to change — `Order.paymentReference` already
-stores the provider reference.
+Stripe Checkout is fully implemented and switches on automatically:
+
+| `STRIPE_SECRET_KEY` | Behaviour |
+| --- | --- |
+| not set | Simulation — no provider is called, the order is marked paid immediately |
+| set | `/checkout` redirects to Stripe Checkout; the order is written `PENDING` and the webhook confirms it |
+
+Setup:
+
+1. Set `STRIPE_SECRET_KEY` (`sk_test_…` to begin with).
+2. In the Stripe dashboard create a webhook endpoint pointing at
+   `https://YOUR-DOMAIN/api/webhooks/stripe` with the events
+   `checkout.session.completed`, `checkout.session.expired` and
+   `checkout.session.async_payment_failed`.
+3. Copy its signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+How it works:
+
+- `POST /api/checkout/session` re-prices every line from the database, applies
+  any coupon (distributed across line items so the Stripe total matches exactly),
+  writes the order as `PENDING`, then creates the Checkout Session.
+- `POST /api/webhooks/stripe` verifies the signature against the **raw** body and
+  is the only code that flips an order to `PAID`. Stock is decremented there,
+  conditionally, so a concurrent sale cannot oversell.
+- Set `PAYMENTS_MODE=simulated` to force the demo path even when a key is set.
+
+Verified here: the guard (503 without a key), payload validation, server-side
+pricing and `PENDING` order creation, the webhook rejecting unsigned requests
+(400), and the coupon distribution maths (4 cases, all exact). The live call to
+`api.stripe.com` could not be exercised — that host is blocked in this sandbox.

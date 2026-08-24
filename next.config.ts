@@ -20,7 +20,11 @@ const embedded = process.env.ALLOW_IFRAME_EMBED === '1'
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  // React needs eval() for its development-only error decoding. Production
+  // builds never call eval, so the allowance is limited to development.
+  `script-src 'self' 'unsafe-inline'${
+    process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"
+  }`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",

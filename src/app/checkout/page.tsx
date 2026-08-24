@@ -1,8 +1,11 @@
 import { CheckoutForm } from '@/components/checkout/CheckoutForm'
+import { paymentMode } from '@/lib/payments'
 
 export const metadata = { title: 'Checkout' }
 
 export default function CheckoutPage() {
+  const mode = paymentMode()
+
   return (
     <div className="container-x px-4 py-10 sm:px-6 lg:px-8">
       <header className="border-b border-line pb-6">
@@ -14,7 +17,7 @@ export default function CheckoutPage() {
       </header>
 
       <div className="mt-8">
-        <CheckoutForm />
+        <CheckoutForm mode={mode} />
       </div>
     </div>
   )

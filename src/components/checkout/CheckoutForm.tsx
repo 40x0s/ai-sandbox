@@ -7,7 +7,8 @@ import { useState } from 'react'
 import { useCart } from '@/lib/cart'
 import { formatPrice } from '@/lib/format'
 
-export function CheckoutForm() {
+export function CheckoutForm({ mode = 'simulated' }: { mode?: 'simulated' | 'stripe' }) {
+  const isStripe = mode === 'stripe'
   const router = useRouter()
   const { items, hydrated, subtotal, shipping, total, clearCart } = useCart()
   const [error, setError] = useState<string | null>(null)
@@ -63,7 +64,8 @@ export function CheckoutForm() {
     }
 
     try {
-      const response = await fetch('/api/orders', {
+      const endpoint = isStripe ? '/api/checkout/session' : '/api/orders'
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -76,6 +78,13 @@ export function CheckoutForm() {
       }
 
       clearCart()
+
+      if (isStripe && data.url) {
+        // Hand off to Stripe's hosted payment page; the webhook confirms the order.
+        window.location.href = data.url
+        return
+      }
+
       router.push(`/checkout/success?id=${data.orderId}`)
       router.refresh()
     } catch {
@@ -145,17 +154,29 @@ export function CheckoutForm() {
         </fieldset>
 
         <fieldset className="space-y-3 border border-dashed border-line p-5">
-          <legend className="eyebrow text-stone">Payment (simulated)</legend>
-          <p className="text-sm text-stone">
-            This is a demo — no card is charged and no payment provider is called. The order is
-            written to SQLite and stock is decremented.
-          </p>
-          <input
-            name="card"
-            placeholder="4242 4242 4242 4242"
-            className={`${inputClass} bg-bone-100/60`}
-            inputMode="numeric"
-          />
+          <legend className="eyebrow text-stone">
+            {isStripe ? 'Payment' : 'Payment (simulated)'}
+          </legend>
+          {isStripe ? (
+            <p className="text-sm text-stone">
+              You will be redirected to Stripe&apos;s secure checkout. Card details never touch
+              this server; the order is confirmed by webhook.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-stone">
+                No payment provider is configured, so this is a simulation — no card is charged.
+                Set <code className="font-mono">STRIPE_SECRET_KEY</code> to enable real Stripe
+                Checkout.
+              </p>
+              <input
+                name="card"
+                placeholder="4242 4242 4242 4242"
+                className={`${inputClass} bg-bone-100/60`}
+                inputMode="numeric"
+              />
+            </>
+          )}
         </fieldset>
 
         {error && (
@@ -169,7 +190,13 @@ export function CheckoutForm() {
           disabled={pending}
           className="w-full bg-ink px-6 py-4 text-xs tracking-[0.16em] text-bone uppercase transition-colors hover:bg-clay disabled:opacity-50"
         >
-          {pending ? 'Placing order…' : `Place order — ${formatPrice(payableTotal)}`}
+          {pending
+            ? isStripe
+              ? 'Redirecting to Stripe…'
+              : 'Placing order…'
+            : isStripe
+              ? `Pay ${formatPrice(payableTotal)}`
+              : `Place order — ${formatPrice(payableTotal)}`}
         </button>
       </div>
 
