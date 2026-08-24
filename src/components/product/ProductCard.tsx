@@ -3,6 +3,8 @@ import Link from 'next/link'
 import type { ProductCardData } from '@/lib/products'
 import { discountPercent, formatPrice } from '@/lib/format'
 import { StarIcon } from '@/components/ui/icons'
+import { QuickAdd } from './QuickAdd'
+import { WishlistToggle } from './WishlistToggle'
 
 export function ProductCard({ product }: { product: ProductCardData }) {
   const discount = discountPercent(product.price, product.compareAtPrice)
@@ -10,19 +12,17 @@ export function ProductCard({ product }: { product: ProductCardData }) {
 
   return (
     <article className="group relative flex flex-col">
-      <Link
-        href={`/products/${product.slug}`}
-        className="relative block aspect-4/5 overflow-hidden bg-bone-100"
-        aria-label={product.name}
-      >
-        <Image
-          src={product.imageUrl}
-          alt={product.name}
-          width={1408}
-          height={768}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
-        />
+      <div className="relative aspect-4/5 overflow-hidden bg-bone-100">
+        <Link href={`/products/${product.slug}`} aria-label={product.name} className="block h-full w-full">
+          <Image
+            src={product.imageUrl}
+            alt={product.name}
+            width={1408}
+            height={768}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]"
+          />
+        </Link>
 
         {discount && !soldOut && (
           <span className="absolute top-3 left-3 bg-clay px-2.5 py-1 text-[10px] tracking-[0.14em] text-bone uppercase">
@@ -35,10 +35,33 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           </span>
         )}
 
-        <span className="absolute inset-x-3 bottom-3 translate-y-2 bg-bone/95 py-2.5 text-center text-[11px] tracking-[0.16em] uppercase opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          View product
-        </span>
-      </Link>
+        <div className="absolute top-2.5 right-2.5 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+          <WishlistToggle
+            product={{
+              id: product.id,
+              slug: product.slug,
+              name: product.name,
+              imageUrl: product.imageUrl,
+              price: product.price,
+            }}
+          />
+        </div>
+
+        <div className="absolute inset-x-0 bottom-0 translate-y-full transition-transform duration-300 ease-out group-focus-within:translate-y-0 group-hover:translate-y-0 md:translate-y-full">
+          <QuickAdd
+            product={{
+              id: product.id,
+              slug: product.slug,
+              name: product.name,
+              imageUrl: product.imageUrl,
+              price: product.price,
+              stock: product.stock,
+            }}
+            sizes={product.sizes}
+            colors={product.colors}
+          />
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-1 flex-col">
         <p className="eyebrow text-stone">{product.category.name}</p>

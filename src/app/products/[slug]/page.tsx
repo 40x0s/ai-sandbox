@@ -1,10 +1,11 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getProductBySlug, getRelatedProducts } from '@/lib/products'
 import { discountPercent, formatPrice } from '@/lib/format'
 import { ProductPurchase } from '@/components/product/ProductPurchase'
 import { ProductCard } from '@/components/product/ProductCard'
+import { WishlistToggle } from '@/components/product/WishlistToggle'
+import { ZoomImage } from '@/components/product/ZoomImage'
 import { ReturnIcon, ShieldIcon, StarIcon, TruckIcon } from '@/components/ui/icons'
 
 export const dynamic = 'force-dynamic'
@@ -54,22 +55,33 @@ export default async function ProductPage({ params }: Props) {
       <div className="mt-6 grid gap-10 lg:grid-cols-2 lg:gap-16">
         {/* Gallery */}
         <div className="lg:sticky lg:top-32 lg:self-start">
-          <div className="group relative aspect-4/5 overflow-hidden bg-bone-100">
-            <Image
+          <div className="relative">
+            <ZoomImage
               src={product.imageUrl}
               alt={product.name}
               width={1408}
               height={768}
-              priority
-              sizes="(max-width: 1024px) 100vw, 50vw"
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+              badge={
+                discount ? (
+                  <span className="absolute top-4 left-4 bg-clay px-3 py-1.5 text-[11px] tracking-[0.14em] text-bone uppercase">
+                    −{discount}%
+                  </span>
+                ) : undefined
+              }
             />
-            {discount && (
-              <span className="absolute top-4 left-4 bg-clay px-3 py-1.5 text-[11px] tracking-[0.14em] text-bone uppercase">
-                −{discount}%
-              </span>
-            )}
+            <div className="absolute top-3 right-3">
+              <WishlistToggle
+                product={{
+                  id: product.id,
+                  slug: product.slug,
+                  name: product.name,
+                  imageUrl: product.imageUrl,
+                  price: product.price,
+                }}
+              />
+            </div>
           </div>
+          <p className="mt-3 text-xs text-stone">Hover the image to zoom · tap the heart to save</p>
         </div>
 
         {/* Details */}

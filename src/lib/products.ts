@@ -19,6 +19,8 @@ export type SortKey = 'featured' | 'newest' | 'price-asc' | 'price-desc' | 'rati
 
 export type CatalogFilters = {
   category?: string
+  /** Free-text search across name, description and category. */
+  q?: string
   /** Always present (possibly empty) so callers can index without null checks. */
   sizes: string[]
   colors: string[]
@@ -37,9 +39,19 @@ const orderByForSort: Record<SortKey, Prisma.ProductOrderByWithRelationInput[]> 
 }
 
 export function buildProductWhere(filters: CatalogFilters): Prisma.ProductWhereInput {
-  const { category, sizes = [], colors = [], minPrice, maxPrice, sale } = filters
+  const { category, q, sizes = [], colors = [], minPrice, maxPrice, sale } = filters
+  const term = q?.trim()
 
   return {
+    ...(term
+      ? {
+          OR: [
+            { name: { contains: term } },
+            { description: { contains: term } },
+            { category: { name: { contains: term } } },
+          ],
+        }
+      : {}),
     ...(category ? { category: { slug: category } } : {}),
     ...(sizes.length > 0 ? { sizes: { some: { label: { in: sizes } } } } : {}),
     ...(colors.length > 0 ? { colors: { some: { slug: { in: colors } } } } : {}),
@@ -102,6 +114,31 @@ export async function getCategoriesWithCounts() {
     slug: category.slug,
     name: category.name,
     productCount: category._count.products,
+  }))
+}
+
+/** Lightweight shape for the live-search dropdown. */
+export async function searchProducts(term: string, take = 6) {
+  const rows = await prisma.product.findMany({
+    where: {
+      OR: [
+        { name: { contains: term } },
+        { description: { contains: term } },
+        { category: { name: { contains: term } } },
+      ],
+    },
+    include: { category: true },
+    orderBy: [{ featured: 'desc' }, { rating: 'desc' }],
+    take,
+  })
+
+  return rows.map((row) => ({
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    price: row.price,
+    imageUrl: row.imageUrl,
+    categoryName: row.category.name,
   }))
 }
 

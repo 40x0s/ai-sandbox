@@ -1,7 +1,9 @@
 import Link from 'next/link'
-import { BagIcon, SearchIcon } from '@/components/ui/icons'
 import { AccountNav } from './AccountNav'
-import { CartCount } from './CartCount'
+import { BagButton } from './BagButton'
+import { MobileMenu } from './MobileMenu'
+import { SearchBox } from './SearchBox'
+import { WishlistMenu } from './WishlistMenu'
 
 const primaryNav = [
   { label: 'Women', href: '/catalog?category=women' },
@@ -22,15 +24,17 @@ export function SiteHeader() {
 
       {/* Main bar */}
       <div className="border-b border-line bg-bone/85 backdrop-blur-md supports-[backdrop-filter]:bg-bone/70">
-        <div className="container-x flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="container-x flex h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
+          <MobileMenu />
+
           <Link
             href="/"
-            className="text-xl font-semibold tracking-[0.24em] uppercase transition-opacity hover:opacity-70"
+            className="shrink-0 text-xl font-semibold tracking-[0.24em] uppercase transition-opacity hover:opacity-70"
           >
             Atelier
           </Link>
 
-          <nav aria-label="Primary" className="hidden items-center gap-8 md:flex">
+          <nav aria-label="Primary" className="hidden items-center gap-8 lg:flex">
             {primaryNav.map((item) => (
               <Link
                 key={item.label}
@@ -42,41 +46,18 @@ export function SiteHeader() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-1">
-            <Link
-              href="/catalog"
-              aria-label="Search products"
-              className="rounded-full p-2.5 text-ink-soft transition-colors hover:bg-bone-100 hover:text-ink"
-            >
-              <SearchIcon className="h-5 w-5" />
-            </Link>
+          <div className="ml-auto hidden flex-1 justify-center px-4 md:flex md:max-w-md">
+            <SearchBox />
+          </div>
+
+          <div className="ml-auto flex items-center gap-1 md:ml-0">
+            <div className="hidden sm:block">
+              <WishlistMenu />
+            </div>
             <AccountNav />
-            <Link
-              href="/cart"
-              aria-label="View cart"
-              className="relative rounded-full p-2.5 text-ink-soft transition-colors hover:bg-bone-100 hover:text-ink"
-            >
-              <BagIcon className="h-5 w-5" />
-              <CartCount />
-            </Link>
+            <BagButton />
           </div>
         </div>
-
-        {/* Mobile category row (scrollable, no JS required) */}
-        <nav
-          aria-label="Categories"
-          className="flex gap-6 overflow-x-auto border-t border-line px-4 py-2.5 md:hidden"
-        >
-          {primaryNav.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="shrink-0 text-sm text-ink-soft transition-colors hover:text-clay"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
       </div>
     </header>
   )

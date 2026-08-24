@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useCart } from '@/lib/cart'
+import { useUi } from '@/lib/ui'
 import { formatPrice } from '@/lib/format'
 
 type Option = { label: string; hex?: string }
@@ -27,7 +28,8 @@ export function ProductPurchase({
   sizes,
   colors,
 }: Props) {
-  const { addItem, count, hydrated } = useCart()
+  const { addItem } = useCart()
+  const { notify, openCart } = useUi()
   const [size, setSize] = useState(sizes[0]?.label ?? '')
   const [color, setColor] = useState(colors[0]?.label ?? '')
   const [quantity, setQuantity] = useState(1)
@@ -52,6 +54,8 @@ export function ProductPurchase({
     })
     setJustAdded(true)
     window.setTimeout(() => setJustAdded(false), 2500)
+    notify(`${quantity} × ${name} added to bag`, { label: 'View bag', onClick: openCart })
+    openCart()
   }
 
   if (soldOut) {
@@ -149,14 +153,10 @@ export function ProductPurchase({
       </div>
 
       <p className="text-sm text-stone" aria-live="polite">
-        {hydrated && justAdded ? (
-          <a href="/cart" className="underline hover:text-ink">
-            View bag ({count} item{count === 1 ? '' : 's'})
-          </a>
+        {justAdded ? (
+          'Added — your bag is open on the right.'
         ) : (
-          <>
-            {stock <= 10 ? `Only ${stock} left in stock` : 'In stock'} · ships in 1–2 business days
-          </>
+          <>{stock <= 10 ? `Only ${stock} left in stock` : 'In stock'} · ships in 1–2 business days</>
         )}
       </p>
 

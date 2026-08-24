@@ -27,9 +27,11 @@ function toCents(value: string | string[] | undefined): number | undefined {
 export function parseCatalogFilters(params: SearchParams): CatalogFilters {
   const category = toArray(params.category)[0]
   const sortRaw = toArray(params.sort)[0] as SortKey | undefined
+  const q = toArray(params.q)[0]?.trim()
 
   return {
     category: category || undefined,
+    q: q && q.length >= 2 ? q : undefined,
     sizes: toArray(params.size),
     colors: toArray(params.color),
     minPrice: toCents(params.min),
@@ -42,6 +44,7 @@ export function parseCatalogFilters(params: SearchParams): CatalogFilters {
 export function countActiveFilters(filters: CatalogFilters): number {
   return (
     (filters.category ? 1 : 0) +
+    (filters.q ? 1 : 0) +
     filters.sizes.length +
     filters.colors.length +
     (filters.minPrice !== undefined ? 1 : 0) +

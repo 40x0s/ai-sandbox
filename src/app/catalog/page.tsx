@@ -2,8 +2,8 @@ import { Suspense } from 'react'
 import { getFilterOptions, getProducts } from '@/lib/products'
 import { countActiveFilters, parseCatalogFilters, type SearchParams } from '@/lib/catalog-params'
 import { ProductCard } from '@/components/product/ProductCard'
-import { FilterPanel } from '@/components/catalog/FilterPanel'
 import { ActiveFilters } from '@/components/catalog/ActiveFilters'
+import { CatalogSearch, FilterControls } from '@/components/catalog/FilterControls'
 import { SortSelect } from '@/components/catalog/SortSelect'
 
 // Filters come from the URL and stock changes from the admin dashboard.
@@ -28,15 +28,17 @@ export default async function CatalogPage({
   ])
 
   const activeCount = countActiveFilters(filters)
-  const categoryLabel = filters.category
-    ? (options.categories.find((c) => c.slug === filters.category)?.name ?? 'Catalogue')
-    : 'All products'
+  const heading = filters.q
+    ? `Results for “${filters.q}”`
+    : filters.category
+      ? (options.categories.find((c) => c.slug === filters.category)?.name ?? 'Catalogue')
+      : 'All products'
 
   return (
     <div className="container-x px-4 py-10 sm:px-6 lg:px-8">
       <header className="border-b border-line pb-6">
         <p className="eyebrow text-clay">Collection</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{categoryLabel}</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{heading}</h1>
         <p className="mt-2 text-sm text-stone">
           {total} {total === 1 ? 'product' : 'products'}
           {activeCount > 0 ? ` · ${activeCount} filter${activeCount === 1 ? '' : 's'} active` : ''}
@@ -45,14 +47,15 @@ export default async function CatalogPage({
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[16rem_1fr]">
         <aside>
-          {/* Collapsible on small screens, always visible from lg up */}
           <details open className="group lg:contents">
             <summary className="flex cursor-pointer items-center justify-between border border-line px-4 py-3 text-sm lg:hidden">
               Filters {activeCount > 0 ? `(${activeCount})` : ''}
-              <span className="text-stone group-open:rotate-180 transition-transform">⌄</span>
+              <span className="text-stone transition-transform group-open:rotate-180">⌄</span>
             </summary>
-            <div className="mt-6 lg:mt-0 lg:sticky lg:top-32">
-              <FilterPanel options={options} filters={filters} />
+            <div className="mt-6 lg:sticky lg:top-32 lg:mt-0">
+              <Suspense fallback={<p className="text-sm text-stone">Loading filters…</p>}>
+                <FilterControls options={options} active={filters} />
+              </Suspense>
             </div>
           </details>
         </aside>
@@ -66,9 +69,14 @@ export default async function CatalogPage({
                 colors: Object.fromEntries(options.colors.map((c) => [c.slug, c.name])),
               }}
             />
-            <Suspense fallback={null}>
-              <SortSelect value={filters.sort ?? 'featured'} />
-            </Suspense>
+            <div className="flex flex-wrap items-center gap-4">
+              <Suspense fallback={null}>
+                <CatalogSearch value={filters.q ?? ''} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <SortSelect value={filters.sort ?? 'featured'} />
+              </Suspense>
+            </div>
           </div>
 
           {products.length === 0 ? (

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { CartProvider } from '@/lib/cart'
+import { WishlistProvider } from '@/lib/wishlist'
+import { Toaster, UiProvider } from '@/lib/ui'
+import { CartDrawer } from '@/components/layout/CartDrawer'
 import { SiteHeader } from '@/components/layout/SiteHeader'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import './globals.css'
@@ -24,22 +27,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${GeistSans.variable} h-full`}>
       <body className="flex min-h-full flex-col antialiased">
-        <CartProvider>
-          <a
-            href="#main"
-            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-ink focus:px-4 focus:py-2 focus:text-bone"
-          >
-            Skip to content
-          </a>
+        <UiProvider>
+          <WishlistProvider>
+            <CartProvider>
+              <a
+                href="#main"
+                className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-ink focus:px-4 focus:py-2 focus:text-bone"
+              >
+                Skip to content
+              </a>
 
-          <SiteHeader />
+              <SiteHeader />
 
-          <main id="main" className="flex-1">
-            {children}
-          </main>
+              <main id="main" className="flex-1">
+                {children}
+              </main>
 
-          <SiteFooter />
-        </CartProvider>
+              <SiteFooter />
+            </CartProvider>
+          </WishlistProvider>
+
+          <CartDrawer />
+          <Toaster />
+        </UiProvider>
       </body>
     </html>
   )

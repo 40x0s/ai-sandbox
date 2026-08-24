@@ -7,10 +7,13 @@ Everything in the feature list below is implemented and verified end-to-end
 
 | Area | What's built |
 | --- | --- |
-| Landing page | Hero, promo banners, category strip, featured products, value props |
-| Catalogue | `/catalog` with category / size / colour / price / sale filters + 5 sort modes, all in the URL |
-| Product page | `/products/[slug]` with size & colour selectors, stock state, quantity, related products |
-| Cart | Context store persisted to `localStorage`, live header badge, quantity controls, free-shipping meter |
+| Landing page | Hero, promo banners, category strip, featured products, value props, scroll reveals |
+| Catalogue | `/catalog` with category / size / colour / price / sale filters + 5 sort modes — **filters apply instantly** and stay in the URL |
+| Product page | `/products/[slug]` with cursor-following image zoom, size & colour selectors, stock state, quantity, related products |
+| Cart | Slide-over mini cart drawer, live header badge, toasts, quantity controls, free-shipping progress bar, `localStorage` persistence |
+| Quick add | Add to bag straight from a product card (size row appears in place) |
+| Live search | Debounced header search (`GET /api/products/search`) with thumbnails and keyboard navigation |
+| Favourites | Heart toggle on every product, persisted to `localStorage`, dropdown in the header |
 | Checkout | `/checkout` → `POST /api/orders` (server-side re-pricing + stock checks) → `/checkout/success` |
 | Auth | Register / login with bcrypt hashes and a signed `jose` JWT session cookie |
 | Admin | `/admin` product list, stats, create / edit / delete — behind an admin guard |
@@ -125,18 +128,20 @@ src/
     api/auth/{register,login,logout}/   api/orders/   api/admin/products/[id]/
   components/
     home/       Hero, PromoBanners, CategoryStrip, FeaturedProducts, ValueProps
-    catalog/    FilterPanel, ActiveFilters, SortSelect
-    product/    ProductCard, ProductPurchase
+    catalog/    FilterControls (instant, URL-synced), CatalogSearch, ActiveFilters, SortSelect
+    product/    ProductCard, ProductPurchase, QuickAdd, WishlistToggle, ZoomImage
     cart/       CartView
     checkout/   CheckoutForm
     admin/      ProductForm, DeleteProductButton
     auth/       AuthForm
-    layout/     SiteHeader, AccountNav, CartCount, SignOutButton, SiteFooter, NewsletterForm
-    ui/         icons
+    layout/     SiteHeader, AccountNav, BagButton, CartCount, CartDrawer, MobileMenu,
+                SearchBox, WishlistMenu, SignOutButton, SiteFooter, NewsletterForm
+    ui/         icons, Reveal
   lib/
     prisma.ts                    PrismaClient singleton + libsql driver adapter
     products.ts  orders.ts  admin.ts      data-access layer (pages never call Prisma directly)
-    cart.tsx                     cart store (useSyncExternalStore + localStorage)
+    cart.tsx  wishlist.tsx       external stores (useSyncExternalStore + localStorage)
+    ui.tsx                       cart drawer state, toast stack, scroll lock
     auth.ts                      JWT session: create / read / destroy / requireUser / requireAdmin
     validators.ts  validators-admin.ts    zod schemas for every API payload
     catalog-params.ts            URL ⇄ filter-state parsing

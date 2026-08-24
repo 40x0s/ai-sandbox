@@ -13,6 +13,7 @@ export function ActiveFilters({ filters, labels }: Props) {
   const without = (key: string, value?: string) => {
     const params = new URLSearchParams()
     if (filters.category && key !== 'category') params.set('category', filters.category)
+    if (filters.q && key !== 'q') params.set('q', filters.q)
     for (const size of filters.sizes) {
       if (key === 'size' && value === size) continue
       params.append('size', size)
@@ -29,6 +30,9 @@ export function ActiveFilters({ filters, labels }: Props) {
     return query ? `/catalog?${query}` : '/catalog'
   }
 
+  if (filters.q) {
+    chips.push({ label: `“${filters.q}”`, href: without('q') })
+  }
   if (filters.category) {
     chips.push({
       label: labels.categories[filters.category] ?? filters.category,
