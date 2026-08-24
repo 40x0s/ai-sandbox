@@ -121,6 +121,22 @@ check "empty bag -> 422" "422" \
   "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/orders -H 'Content-Type: application/json' \
      -d '{"email":"a@b.com","fullName":"A B","address":"12 Test St","city":"Riyadh","postcode":"1","country":"KSA","lines":[]}')"
 
+echo "=== STOCK RACE (two concurrent orders for the last unit) ==="
+HOODIE=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(d.prepare(\"SELECT id FROM Product WHERE slug='little-explorer-hoodie'\").get().id)" 2>/dev/null)
+node -e "const{DatabaseSync}=require('node:sqlite');new DatabaseSync('prisma/dev.db').prepare(\"UPDATE Product SET stock=1 WHERE slug='little-explorer-hoodie'\").run()" 2>/dev/null
+RACE="{\"email\":\"$EMAIL\",\"fullName\":\"Race Buyer\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"lines\":[{\"productId\":\"$HOODIE\",\"size\":\"4Y\",\"color\":\"Mustard\",\"quantity\":1}]}"
+curl -s -o /tmp/r1.json -w "%{http_code}" -X POST $B/api/orders -H 'Content-Type: application/json' -d "$RACE" > /tmp/r1.code &
+curl -s -o /tmp/r2.json -w "%{http_code}" -X POST $B/api/orders -H 'Content-Type: application/json' -d "$RACE" > /tmp/r2.code &
+wait
+CODES="$(cat /tmp/r1.code) $(cat /tmp/r2.code)"
+OK201=$(echo "$CODES" | tr ' ' '\n' | grep -c '^201$')
+OK409=$(echo "$CODES" | tr ' ' '\n' | grep -c '^409$')
+check "exactly one order wins (201)" "1" "$OK201"
+check "the other is rejected (409)" "1" "$OK409"
+FINAL_STOCK=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT stock FROM Product WHERE slug='little-explorer-hoodie'\").get().stock))" 2>/dev/null)
+check "stock ends at 0, never negative" "0" "$FINAL_STOCK"
+node -e "const{DatabaseSync}=require('node:sqlite');new DatabaseSync('prisma/dev.db').prepare(\"UPDATE Product SET stock=76 WHERE slug='little-explorer-hoodie'\").run()" 2>/dev/null
+
 echo "=== ADMIN: DELETE RULES ==="
 check "delete ordered product -> 409 (FK protected)" "409" \
   "$(curl -s -b /tmp/admin.jar -o /dev/null -w '%{http_code}' -X DELETE "$B/api/admin/products/$TEEPID")"

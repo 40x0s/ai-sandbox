@@ -8,11 +8,26 @@ import { redirect } from 'next/navigation'
  */
 
 export const SESSION_COOKIE = 'atelier_session'
+const DEV_FALLBACK_SECRET = 'dev-only-change-me-please-32-chars-min'
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? 'dev-only-change-me-please-32-chars-min',
-)
+/**
+ * Signing key. Refuses to run in production with the placeholder secret — a
+ * leaked signing key means anyone can mint an admin session.
+ */
+function signingKey(): Uint8Array {
+  const value = process.env.AUTH_SECRET ?? ''
+  const weak = !value || value.includes('dev-only-change-me') || value.length < 32
+
+  if (process.env.NODE_ENV === 'production' && weak) {
+    throw new Error(
+      'AUTH_SECRET must be set to your own value of at least 32 characters in production ' +
+        '(generate one with: openssl rand -base64 32).',
+    )
+  }
+
+  return new TextEncoder().encode(weak ? DEV_FALLBACK_SECRET : value)
+}
 
 export type Role = 'CUSTOMER' | 'ADMIN'
 
@@ -26,12 +41,14 @@ export type Session = {
 /**
  * Cookie attributes depend on how the app is being served.
  *
- * A `SameSite=Lax` cookie is NOT sent on cross-site subresource requests, which
- * is exactly what happens when the storefront is embedded in a preview iframe on
- * another domain — login succeeds, the cookie is issued, and then every later
- * request arrives without it. Over HTTPS we therefore use `SameSite=None;
- * Secure` (the Secure flag is mandatory for None). Plain http://localhost keeps
- * the stricter `Lax`, since browsers reject `None` without `Secure`.
+ * `Secure` is required over HTTPS and by `SameSite=None`.
+ *
+ * `SameSite=None` is used ONLY when the app is genuinely embedded cross-site
+ * (the sandbox preview iframe, or an explicit opt-in flag) — a Lax cookie is
+ * not sent on cross-site subresource requests, so login would appear to work
+ * and then every later request would arrive with no session. Everywhere else we
+ * keep `Lax`, which is also what gives the app its browser-level CSRF defence;
+ * weakening it in production would be a security regression.
  */
 async function sessionCookieFlags() {
   const requestHeaders = await headers()
@@ -43,7 +60,9 @@ async function sessionCookieFlags() {
     forwardedProto === 'https' ||
     host.endsWith('.e2b.app') // sandbox live-preview proxy
 
-  return { secure, sameSite: secure ? ('none' as const) : ('lax' as const) }
+  const crossSiteEmbed = host.endsWith('.e2b.app') || process.env.COOKIE_SAMESITE_NONE === '1'
+
+  return { secure, sameSite: crossSiteEmbed ? ('none' as const) : ('lax' as const) }
 }
 
 export async function createSession(session: Session): Promise<void> {
@@ -56,7 +75,7 @@ export async function createSession(session: Session): Promise<void> {
     .setSubject(session.userId)
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE}s`)
-    .sign(secret)
+    .sign(signingKey())
 
   const { secure, sameSite } = await sessionCookieFlags()
   const store = await cookies()
@@ -75,7 +94,7 @@ export async function getSession(): Promise<Session | null> {
   if (!token) return null
 
   try {
-    const { payload } = await jwtVerify(token, secret)
+    const { payload } = await jwtVerify(token, signingKey())
     if (!payload.sub) return null
     return {
       userId: payload.sub,

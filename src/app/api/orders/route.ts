@@ -53,41 +53,65 @@ export async function POST(request: Request) {
 
   const session = await getSession()
 
-  const order = await prisma.$transaction(async (tx) => {
-    const created = await tx.order.create({
-      data: {
-        ...customer,
-        userId: session?.userId ?? null,
-        subtotal,
-        shipping,
-        total,
-        // Simulated payment: the order is considered paid immediately.
-        status: 'PAID',
-        items: {
-          create: lines.map((line) => {
-            const product = productById.get(line.productId)!
-            return {
-              productId: product.id,
-              name: product.name,
-              unitPrice: product.price,
-              quantity: line.quantity,
-              size: line.size,
-              color: line.color,
-            }
-          }),
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({
+        data: {
+          ...customer,
+          userId: session?.userId ?? null,
+          subtotal,
+          shipping,
+          total,
+          // Simulated payment: the order is considered paid immediately.
+          status: 'PAID',
+          items: {
+            create: lines.map((line) => {
+              const product = productById.get(line.productId)!
+              return {
+                productId: product.id,
+                name: product.name,
+                unitPrice: product.price,
+                quantity: line.quantity,
+                size: line.size,
+                color: line.color,
+              }
+            }),
+          },
         },
-      },
+      })
+
+      for (const line of lines) {
+        // Conditional decrement: `stock >= quantity` is part of the WHERE, so if a
+        // concurrent request took the last units between our check and this write,
+        // zero rows update and the whole transaction rolls back instead of
+        // overselling into negative stock.
+        const updated = await tx.product.updateMany({
+          where: { id: line.productId, stock: { gte: line.quantity } },
+          data: { stock: { decrement: line.quantity } },
+        })
+
+        if (updated.count === 0) {
+          throw new StockConflict(
+            `${productById.get(line.productId)?.name ?? 'An item'} just sold out — please review your bag.`,
+          )
+        }
+      }
+
+      return created
     })
 
-    for (const line of lines) {
-      await tx.product.update({
-        where: { id: line.productId },
-        data: { stock: { decrement: line.quantity } },
-      })
+    return NextResponse.json({ ok: true, orderId: order.id, total }, { status: 201 })
+  } catch (error) {
+    if (error instanceof StockConflict) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
     }
+    throw error
+  }
+}
 
-    return created
-  })
-
-  return NextResponse.json({ ok: true, orderId: order.id, total }, { status: 201 })
+class StockConflict extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'StockConflict'
+  }
 }

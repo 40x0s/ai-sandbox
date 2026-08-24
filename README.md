@@ -153,13 +153,16 @@ prisma.config.ts                 Prisma 7 CLI config (datasource URL, seed comma
 
 - **Money is integer cents** (`price`, `subtotal`, `total`) — no float rounding on totals.
 - **Checkout never trusts the client**: `/api/orders` re-reads every price from the database,
-  validates stock, then writes the order and decrements stock inside one transaction.
+  validates stock, then writes the order and decrements stock inside one transaction with a
+  conditional `WHERE stock >= quantity`, so concurrent checkouts cannot oversell.
 - **Cart state** lives in a module-level store read through `useSyncExternalStore`, mirrored to
   `localStorage`. The server render and the first client render both use the empty snapshot, so
   hydration always matches.
-- **Filters are the URL** (`?category=men&size=M&min=40&max=120&sale=1`), so filtered views are
-  shareable and crawlable. The filter form is plain HTML (`method="get"`) and works without JS.
-- **Sessions** are HS256 JWTs in an `httpOnly` cookie. `requireAdmin()` redirects pages;
+- **Filters are the URL** (`?category=men&size=M&min=40&max=120&sale=1&q=linen`), so filtered views
+  are shareable and crawlable. They apply instantly: each control rewrites the query string and the
+  server re-renders the result set.
+- **Sessions** are HS256 JWTs in an `httpOnly`, `Secure`, `SameSite=Lax` cookie (switched to
+  `SameSite=None` only for cross-site embedding). `requireAdmin()` redirects pages;
   `getAdminSession()` returns `null` so API routes can answer `401` JSON.
 - **Deleting a product that appears on an order** returns `409` instead of breaking history —
   order lines keep a denormalised snapshot of name and unit price.
@@ -177,3 +180,47 @@ the committed `prisma/migrations/0001_init/migration.sql` through `node:sqlite` 
 same DDL, same resulting database. The **runtime** query compiler ships inside `@prisma/client` as
 WASM, so the app itself never needs that host. `src/generated/prisma` is committed for the same
 reason; regenerate it with `npm run db:generate` after schema changes.
+
+## 7. Production readiness
+
+**Verdict: a complete, working demo — not yet safe to take real orders on.**
+
+### What is already production-grade
+
+- TypeScript end-to-end (`tsc --noEmit` clean), ESLint clean, production build clean
+- zod validation on every API payload; bcrypt password hashing
+- **The client is never trusted on price**: `/api/orders` re-reads every price from the database
+- Stock is decremented inside a transaction with a conditional `WHERE stock >= quantity`, so two
+  concurrent orders cannot oversell (verified: one wins with 201, the other gets 409, stock ends at 0)
+- Products referenced by orders cannot be deleted (409), preserving order history
+- Session cookie is `HttpOnly; Secure; SameSite=Lax`, and the app **refuses to issue sessions in
+  production with the placeholder `AUTH_SECRET`**
+- Security headers: `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, HSTS
+- Brute-force throttle on login (8 / 5 min per email+IP) and register (5 / 10 min per IP)
+- Pages never touch Prisma directly — swapping databases means editing `lib/prisma.ts` + the schema
+
+### Blockers before going live
+
+| # | Item | Why / what to do |
+| --- | --- | --- |
+| 1 | **SQLite file storage** | A file on disk does not survive serverless/ephemeral filesystems (Vercel, Lambda). Move to Postgres: change the datasource provider and use `@prisma/adapter-pg`, then `prisma migrate dev`. Or deploy on a VM/container with a persistent volume. |
+| 2 | **`AUTH_SECRET`** | Must be your own 32+ character value (`openssl rand -base64 32`). Verified: with the placeholder the login route fails closed with HTTP 500. |
+| 3 | **Admin password** | The seed creates `admin@store.test / admin123`. Change or remove it. |
+| 4 | **Payments** | Checkout is a simulation — no provider is called. Integrate Stripe/Paymob/etc. before charging anyone. |
+| 5 | **Email** | No order confirmation or password reset emails are sent. |
+| 6 | **Framing / CSP** | `X-Frame-Options` and a Content-Security-Policy are intentionally absent so the Arena preview iframe works. Add `X-Frame-Options: DENY` and a nonce-based CSP for a standalone deployment. |
+| 7 | **Rate limiting scope** | In-memory and per instance. Use Redis or an edge limiter for multi-instance deployments. |
+| 8 | **Automated tests** | Only `scripts/e2e.sh` (40 assertions over HTTP). Add unit tests and a CI pipeline. |
+| 9 | **`NEXT_PUBLIC_SITE_URL`** | Set it to the real domain, otherwise Open Graph image URLs point at localhost. |
+| 10 | **Product images** | Served from `public/images`. Real catalogs need object storage + a CDN and an upload flow. |
+
+### Deploying once the database is swapped
+
+```bash
+npm ci
+npx prisma migrate deploy     # applies committed migrations
+npm run db:seed               # optional: demo data
+npm run build && npm start
+```
+
+Required environment: `DATABASE_URL`, `AUTH_SECRET`, `NEXT_PUBLIC_SITE_URL`.

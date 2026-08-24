@@ -3,6 +3,7 @@ import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { createSession } from '@/lib/auth'
 import { registerSchema } from '@/lib/validators'
+import { rateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
@@ -12,6 +13,15 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? 'Invalid details' },
       { status: 422 },
+    )
+  }
+
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'local'
+  const throttle = rateLimit(`register:${ip}`, { limit: 5, windowMs: 10 * 60_000 })
+  if (!throttle.ok) {
+    return NextResponse.json(
+      { error: `Too many accounts created from this address. Try again in ${throttle.retryAfterSeconds}s.` },
+      { status: 429 },
     )
   }
 

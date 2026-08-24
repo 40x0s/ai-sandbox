@@ -9,7 +9,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter'
 import './globals.css'
 
 export const metadata: Metadata = {
-  metadataBase: new URL('http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'),
   title: {
     default: 'ATELIER — Considered clothing for every day',
     template: '%s · ATELIER',
