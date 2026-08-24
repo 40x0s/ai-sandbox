@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireAdmin } from '@/lib/auth'
+import { hasDefaultAdminPassword } from '@/lib/admin'
 
 export const metadata = { title: 'Admin' }
 export const dynamic = 'force-dynamic'
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic'
 /** Everything under /admin is behind the admin guard. */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAdmin()
+  const defaultPassword = await hasDefaultAdminPassword()
 
   return (
     <div className="container-x px-4 py-10 sm:px-6 lg:px-8">
@@ -37,6 +39,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </Link>
         </nav>
       </header>
+
+      {defaultPassword && (
+        <div
+          role="alert"
+          className="mt-6 border border-clay/40 bg-clay/5 px-4 py-3 text-sm text-clay"
+        >
+          <span className="font-medium">Security:</span> the admin account still uses the seeded
+          password <code className="font-mono">admin123</code>. Change it before taking this
+          deployment live.
+        </div>
+      )}
 
       <div className="mt-8">{children}</div>
     </div>

@@ -224,19 +224,42 @@ reason; regenerate it with `npm run db:generate` after schema changes.
 | 3 | **Admin password** | The seed creates `admin@store.test / admin123`. Change or remove it. |
 | 4 | **Payments** | Checkout is a simulation — no provider is called. Integrate Stripe/Paymob/etc. before charging anyone. |
 | 5 | **Email** | No order confirmation or password reset emails are sent. |
-| 6 | **Framing / CSP** | `X-Frame-Options` and a Content-Security-Policy are intentionally absent so the Arena preview iframe works. Add `X-Frame-Options: DENY` and a nonce-based CSP for a standalone deployment. |
+| 6 | **CSP strictness** | `X-Frame-Options: DENY` + `frame-ancestors 'none'` now ship by default (verified). The CSP still allows `'unsafe-inline'` for scripts/styles because Next emits inline bootstrap code — move to Next's nonce-based CSP before handling real customer data. |
 | 7 | **Rate limiting scope** | In-memory and per instance. Use Redis or an edge limiter for multi-instance deployments. |
-| 8 | **Automated tests** | Only `scripts/e2e.sh` (67 assertions over HTTP). Add unit tests and a CI pipeline. |
+| 8 | **Automated tests** | `scripts/e2e.sh` (67 assertions) runs in CI (`.github/workflows/ci.yml`: lint → typecheck → db → build → e2e). Unit tests are still missing. |
 | 9 | **`NEXT_PUBLIC_SITE_URL`** | Set it to the real domain, otherwise Open Graph image URLs point at localhost. |
 | 10 | **Product images** | Served from `public/images`. Real catalogs need object storage + a CDN and an upload flow. |
 
-### Deploying once the database is swapped
+### Deploying with Docker (SQLite on a persistent volume)
+
+Works on any container host with real storage — Fly.io, Railway, Render, a VPS.
+**Not** on serverless (ephemeral filesystem).
+
+```bash
+export AUTH_SECRET="$(openssl rand -base64 32)"
+docker compose up --build          # http://localhost:3000
+```
+
+The image runs `db:setup:offline` on every start; applied migrations are recorded
+in `_applied_migrations`, so restarts are safe. The SQLite file lives in the
+`atelier-data` volume at `/app/data/atelier.db`.
+
+Bare metal / VM instead:
 
 ```bash
 npm ci
-npx prisma migrate deploy     # applies committed migrations
-npm run db:seed               # optional: demo data
+cp .env.example .env      # then set AUTH_SECRET and NEXT_PUBLIC_SITE_URL
+npm run db:setup          # or db:setup:offline where binaries.prisma.sh is blocked
 npm run build && npm start
 ```
 
 Required environment: `DATABASE_URL`, `AUTH_SECRET`, `NEXT_PUBLIC_SITE_URL`.
+See `.env.production.example`.
+
+### Payments
+
+`src/lib/payments.ts` is the only place that touches payment. It is a simulation
+today: with `PAYMENTS_MODE=live` it fails closed with HTTP 402 rather than
+marking an unpaid order as paid. Implement the `live` branch (Stripe, Paymob,
+Checkout.com…) and nothing else has to change — `Order.paymentReference` already
+stores the provider reference.

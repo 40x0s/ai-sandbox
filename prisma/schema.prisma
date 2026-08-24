@@ -127,6 +127,8 @@ model Order {
   couponCode String?
   shipping  Int
   total     Int
+  /// Reference returned by the payment provider (see src/lib/payments.ts).
+  paymentReference String?
   /// "PENDING" | "PAID" | "SHIPPED" | "CANCELLED"
   status    String      @default("PENDING")
   items     OrderItem[]

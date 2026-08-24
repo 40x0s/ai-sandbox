@@ -1315,6 +1315,7 @@ export const OrderScalarFieldEnum = {
   couponCode: 'couponCode',
   shipping: 'shipping',
   total: 'total',
+  paymentReference: 'paymentReference',
   status: 'status',
   createdAt: 'createdAt'
 } as const

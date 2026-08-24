@@ -1,3 +1,4 @@
+import { compare } from 'bcryptjs'
 import { prisma } from './prisma'
 import { getSession, type Session } from './auth'
 
@@ -99,6 +100,19 @@ export async function replaceGallery(productId: string, mainUrl: string, extraUr
       position,
     })),
   })
+}
+
+/** True while any admin still uses the password created by the seed script. */
+export async function hasDefaultAdminPassword(): Promise<boolean> {
+  const admins = await prisma.user.findMany({
+    where: { role: 'ADMIN' },
+    select: { passwordHash: true },
+  })
+
+  for (const admin of admins) {
+    if (await compare('admin123', admin.passwordHash)) return true
+  }
+  return false
 }
 
 export async function getAdminOrders(limit = 50) {

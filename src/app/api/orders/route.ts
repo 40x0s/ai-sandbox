@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth'
 import { checkoutSchema } from '@/lib/validators'
 import { shippingFor } from '@/lib/pricing'
 import { validateCoupon } from '@/lib/coupons'
+import { capturePayment } from '@/lib/payments'
 
 /**
  * Checkout simulation: validates the bag against the database, re-prices every
@@ -66,6 +67,15 @@ export async function POST(request: Request) {
 
   const session = await getSession()
 
+  // Capture first: if payment fails there is no order to clean up.
+  const payment = await capturePayment({
+    amountCents: total,
+    email: customer.email,
+  })
+  if (!payment.ok) {
+    return NextResponse.json({ error: payment.error }, { status: 402 })
+  }
+
   try {
     const order = await prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
@@ -77,7 +87,8 @@ export async function POST(request: Request) {
           couponCode: appliedCoupon,
           shipping,
           total,
-          // Simulated payment: the order is considered paid immediately.
+          paymentReference: payment.reference,
+          // capturePayment() succeeded, so the order is considered paid.
           status: 'PAID',
           items: {
             create: lines.map((line) => {
