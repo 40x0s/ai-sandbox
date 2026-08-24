@@ -1,0 +1,57 @@
+# See https://help.github.com/articles/ignoring-files/for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files — keep the committed example, ignore real secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# local SQLite database (recreate with `npm run db:setup`)
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/*.db-wal
+/prisma/*.db-shm
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# NOTE: src/generated/prisma (the generated Prisma Client) is intentionally
+# committed so the project builds on machines that cannot reach
+# binaries.prisma.sh. Re-generate it with `npm run db:generate` after any
+# schema change.

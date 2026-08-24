@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------
+   Design tokens (Tailwind v4 theme). Everything in the UI derives
+   from these — no hard-coded hex values in components.
+----------------------------------------------------------------*/
+@theme {
+  /* Surfaces & ink */
+  --color-bone: #faf8f4;
+  --color-bone-100: #f2eee5;
+  --color-ink: #141517;
+  --color-ink-soft: #2c2d30;
+  --color-stone: #6f6a63;
+  --color-line: #e6e1d8;
+
+  /* Accents */
+  --color-clay: #b0512f;
+  --color-clay-600: #97431f;
+  --color-sage: #5c6b52;
+
+  /* Type — Geist is bundled from the `geist` package (no network fetch) */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --shadow-card: 0 1px 2px rgba(20, 21, 23, 0.04), 0 12px 28px -16px rgba(20, 21, 23, 0.18);
+  --shadow-lift: 0 2px 4px rgba(20, 21, 23, 0.05), 0 24px 48px -24px rgba(20, 21, 23, 0.28);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-bone);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-ink);
+    color: var(--color-bone);
+  }
+
+  /* Visible focus ring for keyboard users across the whole app */
+  :focus-visible {
+    outline: 2px solid var(--color-clay);
+    outline-offset: 2px;
+  }
+}
+
+/* Shared page container */
+@utility container-x {
+  width: 100%;
+  margin-inline: auto;
+  max-width: 84rem;
+  padding-inline: 1rem;
+}
+
+/* Small uppercase section label used across the site */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
