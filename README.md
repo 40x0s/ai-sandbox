@@ -317,3 +317,18 @@ Verified here: the guard (503 without a key), payload validation, server-side
 pricing and `PENDING` order creation, the webhook rejecting unsigned requests
 (400), and the coupon distribution maths (4 cases, all exact). The live call to
 `api.stripe.com` could not be exercised — that host is blocked in this sandbox.
+
+### Continuous integration
+
+A ready-to-use GitHub Actions pipeline lives at `docs/github-actions-ci.yml`
+(lint → typecheck → database → build → 67 end-to-end assertions against a real
+PostgreSQL service container). It is kept outside `.github/workflows/` because
+pushing workflow files requires the `workflows` permission on the GitHub App.
+
+To enable it, copy the file into place yourself:
+
+```bash
+mkdir -p .github/workflows
+cp docs/github-actions-ci.yml .github/workflows/ci.yml
+git add .github && git commit -m "Enable CI" && git push
+```
