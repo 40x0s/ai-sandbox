@@ -17,7 +17,41 @@ Everything in the feature list below is implemented and verified end-to-end
 
 ---
 
-## 1. Setup
+## 1. Running it after downloading the folder
+
+`node_modules/` and `prisma/dev.db` are **not** in the repository, so a fresh copy needs four
+commands. Requires **Node.js ≥ 20.9** (`node -v`).
+
+```bash
+cd <the-folder>
+npm install                 # ~20s
+cp .env.example .env        # DATABASE_URL + AUTH_SECRET
+npm run db:setup            # creates prisma/dev.db, applies the migration, seeds 7 products
+npm run dev                 # → http://localhost:3000
+```
+
+Sign in as `admin@store.test` / `admin123` to reach `/admin`.
+
+If `npm run db:setup` fails with an error mentioning **binaries.prisma.sh**, your network is
+blocking Prisma's engine download — use the fallback instead (same SQL, same result):
+
+```bash
+npm run db:setup:offline
+```
+
+If your copy already contains `prisma/dev.db` (e.g. you copied the whole directory rather than
+cloning), skip the database step and just run `npm install && npm run dev`.
+
+Production build:
+
+```bash
+npm run build && npm start
+```
+
+> Note: if you ever delete or replace `prisma/dev.db`, **restart `npm run dev` first**. A running
+> dev server keeps the old file handle and every write then fails with `SQLITE_READONLY`.
+
+## 2. Setting the project up from scratch
 
 ```bash
 npx create-next-app@16.3.2 storefront \
@@ -49,7 +83,7 @@ npm run dev                           # http://localhost:3000
 | `npm run db:setup:offline` | Same, but applies the committed SQL without the Prisma CLI |
 | `bash scripts/e2e.sh` | End-to-end smoke test against a running dev server |
 
-## 2. Demo accounts
+## 3. Demo accounts
 
 | Role | Email | Password |
 | --- | --- | --- |
@@ -58,7 +92,7 @@ npm run dev                           # http://localhost:3000
 
 The admin account is what unlocks `/admin`. Passwords are stored as bcrypt hashes.
 
-## 3. Routes
+## 4. Routes
 
 **Storefront** — `/`, `/catalog`, `/products/[slug]`, `/cart`, `/checkout`, `/checkout/success`,
 `/login`, `/register`
@@ -68,7 +102,7 @@ The admin account is what unlocks `/admin`. Passwords are stored as bcrypt hashe
 **API** — `POST /api/auth/{register,login,logout}` · `POST /api/orders` ·
 `POST /api/admin/products` · `PATCH|DELETE /api/admin/products/[id]`
 
-## 4. Folder structure
+## 5. Folder structure
 
 ```
 prisma/
@@ -110,7 +144,7 @@ src/
 prisma.config.ts                 Prisma 7 CLI config (datasource URL, seed command)
 ```
 
-## 5. How it works
+## 6. How it works
 
 - **Money is integer cents** (`price`, `subtotal`, `total`) — no float rounding on totals.
 - **Checkout never trusts the client**: `/api/orders` re-reads every price from the database,
