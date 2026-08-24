@@ -30,7 +30,7 @@ export default async function CheckoutSuccessPage({
           <span className="text-ink">{order.email}</span>.
         </p>
 
-        <dl className="mt-8 grid grid-cols-2 gap-4 border border-line bg-white/60 p-6 text-sm sm:grid-cols-4">
+        <dl className="mt-8 grid grid-cols-2 gap-4 border border-line bg-bone-100/60 p-6 text-sm sm:grid-cols-4">
           <div>
             <dt className="eyebrow text-stone">Order</dt>
             <dd className="mt-1 font-mono text-xs">{order.id.slice(-8).toUpperCase()}</dd>
@@ -47,6 +47,15 @@ export default async function CheckoutSuccessPage({
             <dt className="eyebrow text-stone">Shipping</dt>
             <dd className="mt-1">{formatPrice(order.shipping) === '$0.00' ? 'Free' : formatPrice(order.shipping)}</dd>
           </div>
+          {order.discount > 0 && (
+            <div>
+              <dt className="eyebrow text-stone">Discount</dt>
+              <dd className="mt-1 text-sage tabular-nums">
+                −{formatPrice(order.discount)}
+                {order.couponCode ? ` (${order.couponCode})` : ''}
+              </dd>
+            </div>
+          )}
         </dl>
 
         <h2 className="mt-10 text-sm font-medium tracking-[0.14em] uppercase">Items</h2>

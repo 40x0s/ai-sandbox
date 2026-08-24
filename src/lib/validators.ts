@@ -31,6 +31,7 @@ export const checkoutSchema = z.object({
   city: z.string().trim().min(2, 'Enter a city').max(80),
   postcode: z.string().trim().min(2, 'Enter a postcode').max(20),
   country: z.string().trim().min(2, 'Enter a country').max(80),
+  couponCode: z.string().trim().max(40).optional(),
   lines: z.array(orderLineSchema).min(1, 'Your bag is empty').max(50),
 })
 

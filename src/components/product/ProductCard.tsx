@@ -5,6 +5,7 @@ import { discountPercent, formatPrice } from '@/lib/format'
 import { StarIcon } from '@/components/ui/icons'
 import { QuickAdd } from './QuickAdd'
 import { WishlistToggle } from './WishlistToggle'
+import { CompareToggle } from './CompareToggle'
 
 export function ProductCard({ product }: { product: ProductCardData }) {
   const discount = discountPercent(product.price, product.compareAtPrice)
@@ -35,7 +36,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           </span>
         )}
 
-        <div className="absolute top-2.5 right-2.5 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
+        <div className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1.5 opacity-100 transition-opacity duration-200 md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
           <WishlistToggle
             product={{
               id: product.id,
@@ -43,6 +44,14 @@ export function ProductCard({ product }: { product: ProductCardData }) {
               name: product.name,
               imageUrl: product.imageUrl,
               price: product.price,
+            }}
+          />
+          <CompareToggle
+            product={{
+              id: product.id,
+              slug: product.slug,
+              name: product.name,
+              imageUrl: product.imageUrl,
             }}
           />
         </div>

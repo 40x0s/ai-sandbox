@@ -12,6 +12,14 @@ export function CheckoutForm() {
   const { items, hydrated, subtotal, shipping, total, clearCart } = useCart()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [couponInput, setCouponInput] = useState('')
+  const [coupon, setCoupon] = useState<{ code: string; percentOff: number; discount: number } | null>(
+    null,
+  )
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [couponPending, setCouponPending] = useState(false)
+
+  const payableTotal = Math.max(0, total - (coupon?.discount ?? 0))
 
   if (!hydrated) {
     return <p className="py-24 text-center text-sm text-stone">Loading your bag…</p>
@@ -45,6 +53,7 @@ export function CheckoutForm() {
       city: String(form.get('city') ?? ''),
       postcode: String(form.get('postcode') ?? ''),
       country: String(form.get('country') ?? ''),
+      ...(coupon ? { couponCode: coupon.code } : {}),
       lines: items.map((item) => ({
         productId: item.productId,
         size: item.size,
@@ -160,11 +169,11 @@ export function CheckoutForm() {
           disabled={pending}
           className="w-full bg-ink px-6 py-4 text-xs tracking-[0.16em] text-bone uppercase transition-colors hover:bg-clay disabled:opacity-50"
         >
-          {pending ? 'Placing order…' : `Place order — ${formatPrice(total)}`}
+          {pending ? 'Placing order…' : `Place order — ${formatPrice(payableTotal)}`}
         </button>
       </div>
 
-      <aside className="h-fit border border-line bg-white/60 p-6 lg:sticky lg:top-32">
+      <aside className="h-fit border border-line bg-bone-100/60 p-6 lg:sticky lg:top-32">
         <h2 className="text-sm font-medium tracking-[0.14em] uppercase">Your bag</h2>
 
         <ul className="mt-5 space-y-4">
@@ -190,18 +199,95 @@ export function CheckoutForm() {
           ))}
         </ul>
 
+        {/* Coupon */}
+        <div className="mt-6 border-t border-line pt-5">
+          <label htmlFor="coupon" className="eyebrow text-stone">
+            Discount code
+          </label>
+          {coupon ? (
+            <div className="mt-2 flex items-center justify-between gap-2 border border-sage/40 bg-sage/10 px-3 py-2 text-sm">
+              <span className="font-mono text-xs">
+                {coupon.code} · −{coupon.percentOff}%
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCoupon(null)
+                  setCouponInput('')
+                  setCouponError(null)
+                }}
+                className="text-xs text-stone underline hover:text-clay"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="mt-2 flex gap-2">
+              <input
+                id="coupon"
+                value={couponInput}
+                onChange={(event) => {
+                  setCouponInput(event.target.value)
+                  setCouponError(null)
+                }}
+                placeholder="WELCOME10"
+                className="w-full border border-line bg-transparent px-3 py-2 font-mono text-xs uppercase focus:border-ink focus:outline-none"
+              />
+              <button
+                type="button"
+                disabled={couponPending}
+                onClick={async () => {
+                  setCouponError(null)
+                  setCouponPending(true)
+                  try {
+                    const response = await fetch('/api/coupons', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ code: couponInput, subtotal }),
+                    })
+                    const data = await response.json().catch(() => ({}))
+                    if (!response.ok) {
+                      setCouponError(data.error ?? 'That code did not work.')
+                      return
+                    }
+                    setCoupon({
+                      code: data.code,
+                      percentOff: data.percentOff,
+                      discount: data.discount,
+                    })
+                  } catch {
+                    setCouponError('Network error. Please try again.')
+                  } finally {
+                    setCouponPending(false)
+                  }
+                }}
+                className="shrink-0 border border-line px-4 py-2 text-xs tracking-[0.12em] uppercase transition-colors hover:border-ink hover:bg-ink hover:text-bone disabled:opacity-50"
+              >
+                {couponPending ? '…' : 'Apply'}
+              </button>
+            </div>
+          )}
+          {couponError && <p className="mt-2 text-xs text-clay">{couponError}</p>}
+        </div>
+
         <dl className="mt-6 space-y-3 border-t border-line pt-5 text-sm">
           <div className="flex justify-between">
             <dt className="text-stone">Subtotal</dt>
             <dd className="tabular-nums">{formatPrice(subtotal)}</dd>
           </div>
+          {coupon && (
+            <div className="flex justify-between text-sage">
+              <dt>Discount ({coupon.code})</dt>
+              <dd className="tabular-nums">−{formatPrice(coupon.discount)}</dd>
+            </div>
+          )}
           <div className="flex justify-between">
             <dt className="text-stone">Shipping</dt>
             <dd className="tabular-nums">{shipping === 0 ? 'Free' : formatPrice(shipping)}</dd>
           </div>
           <div className="flex justify-between border-t border-line pt-3 text-base font-medium">
             <dt>Total</dt>
-            <dd className="tabular-nums">{formatPrice(total)}</dd>
+            <dd className="tabular-nums">{formatPrice(payableTotal)}</dd>
           </div>
         </dl>
       </aside>

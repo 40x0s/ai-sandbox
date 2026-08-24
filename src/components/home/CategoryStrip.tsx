@@ -27,7 +27,7 @@ export function CategoryStrip({ categories }: Props) {
           <li key={category.slug}>
             <Link
               href={`/catalog?category=${category.slug}`}
-              className="group flex items-center justify-between border border-line bg-white/60 px-6 py-7 transition-all hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-card"
+              className="group flex items-center justify-between border border-line bg-bone-100/60 px-6 py-7 transition-all hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-card"
             >
               <span>
                 <span className="block text-lg font-medium tracking-tight">{category.name}</span>

@@ -3,6 +3,7 @@ import { AccountNav } from './AccountNav'
 import { BagButton } from './BagButton'
 import { MobileMenu } from './MobileMenu'
 import { SearchBox } from './SearchBox'
+import { ThemeToggle } from './ThemeToggle'
 import { WishlistMenu } from './WishlistMenu'
 
 const primaryNav = [
@@ -51,6 +52,7 @@ export function SiteHeader() {
           </div>
 
           <div className="ml-auto flex items-center gap-1 md:ml-0">
+            <ThemeToggle />
             <div className="hidden sm:block">
               <WishlistMenu />
             </div>

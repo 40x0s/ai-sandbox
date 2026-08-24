@@ -21,6 +21,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             Products
           </Link>
           <Link
+            href="/admin/orders"
+            className="border border-line px-4 py-2.5 transition-colors hover:border-ink"
+          >
+            Orders
+          </Link>
+          <Link
             href="/admin/products/new"
             className="bg-ink px-4 py-2.5 text-bone transition-colors hover:bg-clay"
           >

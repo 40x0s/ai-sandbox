@@ -67,6 +67,21 @@ export type Size = Prisma.SizeModel
  */
 export type Product = Prisma.ProductModel
 /**
+ * Model ProductImage
+ * Extra product photography. The first image (position 0) is the card image.
+ */
+export type ProductImage = Prisma.ProductImageModel
+/**
+ * Model Review
+ * 
+ */
+export type Review = Prisma.ReviewModel
+/**
+ * Model Coupon
+ * 
+ */
+export type Coupon = Prisma.CouponModel
+/**
  * Model Order
  * 
  */

@@ -17,7 +17,12 @@ export async function getAdminProducts() {
 export async function getAdminProduct(id: string) {
   return prisma.product.findUnique({
     where: { id },
-    include: { category: true, colors: true, sizes: true },
+    include: {
+      category: true,
+      colors: true,
+      sizes: true,
+      images: { orderBy: { position: 'asc' } },
+    },
   })
 }
 
@@ -79,4 +84,35 @@ export async function validateTaxonomyRefs(data: {
   }
 
   return null
+}
+
+/** Rebuilds a product's gallery: main image at position 0, then the extras. */
+export async function replaceGallery(productId: string, mainUrl: string, extraUrls: string[]) {
+  const urls = [mainUrl, ...extraUrls.filter((url) => url.length > 0 && url !== mainUrl)]
+
+  await prisma.productImage.deleteMany({ where: { productId } })
+  await prisma.productImage.createMany({
+    data: urls.map((url, position) => ({
+      productId,
+      url,
+      alt: position === 0 ? '' : `View ${position + 1}`,
+      position,
+    })),
+  })
+}
+
+export async function getAdminOrders(limit = 50) {
+  return prisma.order.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    include: { items: true },
+  })
+}
+
+export async function getOrdersForUser(userId: string) {
+  return prisma.order.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    include: { items: true },
+  })
 }

@@ -62,21 +62,34 @@ export function buildProductWhere(filters: CatalogFilters): Prisma.ProductWhereI
   }
 }
 
+export const CATALOG_PAGE_SIZE = 9
+
 export async function getProducts(
   filters: CatalogFilters,
-): Promise<{ products: ProductCardData[]; total: number }> {
+  options?: { page?: number; pageSize?: number },
+) {
   const where = buildProductWhere(filters)
+  const pageSize = options?.pageSize ?? CATALOG_PAGE_SIZE
+  const page = Math.max(1, options?.page ?? 1)
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
       include: productCardInclude,
       orderBy: orderByForSort[filters.sort ?? 'featured'],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     prisma.product.count({ where }),
   ])
 
-  return { products, total }
+  return {
+    products,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  }
 }
 
 export async function getFilterOptions() {
@@ -146,6 +159,8 @@ export const productDetailInclude = {
   category: true,
   colors: true,
   sizes: { orderBy: { sort: 'asc' as const } },
+  images: { orderBy: { position: 'asc' as const } },
+  reviews: { orderBy: { createdAt: 'desc' as const } },
 } satisfies Prisma.ProductInclude
 
 export type ProductDetailData = Prisma.ProductGetPayload<{ include: typeof productDetailInclude }>
@@ -163,5 +178,30 @@ export async function getRelatedProducts(
     include: productCardInclude,
     orderBy: { rating: 'desc' },
     take: limit,
+  })
+}
+
+/** Full comparison rows for /compare?ids=a,b,c */
+export async function getProductsByIds(ids: string[]) {
+  if (ids.length === 0) return []
+
+  return prisma.product.findMany({
+    where: { id: { in: ids } },
+    include: {
+      category: true,
+      colors: true,
+      sizes: { orderBy: { sort: 'asc' } },
+      images: { orderBy: { position: 'asc' } },
+      _count: { select: { reviews: true } },
+    },
+  })
+}
+
+export type ComparisonProduct = Awaited<ReturnType<typeof getProductsByIds>>[number]
+
+export async function getAllProductSlugs() {
+  return prisma.product.findMany({
+    select: { slug: true, updatedAt: true },
+    orderBy: { updatedAt: 'desc' },
   })
 }

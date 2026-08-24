@@ -63,7 +63,7 @@ export function ActiveFilters({ filters, labels }: Props) {
         <li key={`${chip.label}-${chip.href}`}>
           <Link
             href={chip.href}
-            className="inline-flex items-center gap-2 border border-line bg-white/70 px-3 py-1.5 text-xs transition-colors hover:border-ink"
+            className="inline-flex items-center gap-2 border border-line bg-bone-100/70 px-3 py-1.5 text-xs transition-colors hover:border-ink"
           >
             {chip.label}
             <span aria-hidden className="text-stone">

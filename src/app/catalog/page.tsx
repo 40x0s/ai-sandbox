@@ -5,6 +5,7 @@ import { ProductCard } from '@/components/product/ProductCard'
 import { ActiveFilters } from '@/components/catalog/ActiveFilters'
 import { CatalogSearch, FilterControls } from '@/components/catalog/FilterControls'
 import { SortSelect } from '@/components/catalog/SortSelect'
+import { Pagination } from '@/components/catalog/Pagination'
 
 // Filters come from the URL and stock changes from the admin dashboard.
 export const dynamic = 'force-dynamic'
@@ -22,10 +23,17 @@ export default async function CatalogPage({
   const params = await searchParams
   const filters = parseCatalogFilters(params)
 
-  const [{ products, total }, options] = await Promise.all([
-    getProducts(filters),
+  const rawPage = Array.isArray(params.page) ? params.page[0] : params.page
+  const requestedPage = Number.parseInt(rawPage ?? '1', 10)
+  const page = Number.isFinite(requestedPage) ? requestedPage : 1
+
+  const [result, options] = await Promise.all([
+    getProducts(filters, { page }),
     getFilterOptions(),
   ])
+  const { products, total, totalPages } = result
+  const firstShown = total === 0 ? 0 : (result.page - 1) * result.pageSize + 1
+  const lastShown = Math.min(total, result.page * result.pageSize)
 
   const activeCount = countActiveFilters(filters)
   const heading = filters.q
@@ -40,7 +48,9 @@ export default async function CatalogPage({
         <p className="eyebrow text-clay">Collection</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{heading}</h1>
         <p className="mt-2 text-sm text-stone">
-          {total} {total === 1 ? 'product' : 'products'}
+          {total === 0
+            ? 'No products'
+            : `Showing ${firstShown}–${lastShown} of ${total} ${total === 1 ? 'product' : 'products'}`}
           {activeCount > 0 ? ` · ${activeCount} filter${activeCount === 1 ? '' : 's'} active` : ''}
         </p>
       </header>
@@ -99,6 +109,8 @@ export default async function CatalogPage({
               ))}
             </div>
           )}
+
+          <Pagination page={result.page} totalPages={totalPages} searchParams={params} />
         </section>
       </div>
     </div>

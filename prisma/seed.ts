@@ -36,6 +36,8 @@ const sizes = [
   { label: '8Y', sort: 9 },
 ]
 
+type SeedReview = { author: string; rating: number; title: string; body: string }
+
 type SeedProduct = {
   slug: string
   name: string
@@ -50,6 +52,7 @@ type SeedProduct = {
   category: string
   colors: string[]
   sizes: string[]
+  reviews: SeedReview[]
 }
 
 const products: SeedProduct[] = [
@@ -68,6 +71,20 @@ const products: SeedProduct[] = [
     category: 'men',
     colors: ['white', 'black', 'navy'],
     sizes: ['S', 'M', 'L', 'XL'],
+    reviews: [
+      {
+        author: 'Omar A.',
+        rating: 5,
+        title: 'The neckline actually survives the wash',
+        body: 'I have bought four of these now. Most tees go slack at the collar after a month — this one has not. Slightly boxy, which is what I wanted for layering.',
+      },
+      {
+        author: 'Daniel R.',
+        rating: 4,
+        title: 'Heavy in a good way',
+        body: '240gsm is genuinely substantial. Runs a touch large, so size down if you want it fitted.',
+      },
+    ],
   },
   {
     slug: 'classic-denim-jacket',
@@ -84,6 +101,20 @@ const products: SeedProduct[] = [
     category: 'men',
     colors: ['indigo'],
     sizes: ['S', 'M', 'L', 'XL'],
+    reviews: [
+      {
+        author: 'Yousef K.',
+        rating: 5,
+        title: 'Proper rigid denim',
+        body: 'Stiff for the first two weeks, exactly as it should be. The copper hardware and selvedge ID are lovely details. Cropped cut sits well over a hoodie.',
+      },
+      {
+        author: 'Marc T.',
+        rating: 5,
+        title: 'Worth the money',
+        body: 'Third winter with it and the fades are starting to show at the elbows. No seam failures at all.',
+      },
+    ],
   },
   {
     slug: 'meadow-floral-midi-dress',
@@ -99,6 +130,20 @@ const products: SeedProduct[] = [
     category: 'women',
     colors: ['cream'],
     sizes: ['XS', 'S', 'M', 'L'],
+    reviews: [
+      {
+        author: 'Layla M.',
+        rating: 5,
+        title: 'Beautiful movement',
+        body: 'The bias cut means it skims rather than clings, and the lining stops it being see-through in sunlight. The tie waist makes it very adjustable.',
+      },
+      {
+        author: 'Sara H.',
+        rating: 4,
+        title: 'Lovely, delicate print',
+        body: 'Hand wash only, which is the one downside. Otherwise it has become my default summer dress.',
+      },
+    ],
   },
   {
     slug: 'little-explorer-hoodie',
@@ -115,6 +160,20 @@ const products: SeedProduct[] = [
     category: 'kids',
     colors: ['mustard'],
     sizes: ['2Y', '4Y', '6Y', '8Y'],
+    reviews: [
+      {
+        author: 'Noura S.',
+        rating: 5,
+        title: 'Survived a whole school year',
+        body: 'Washed weekly, still soft, no pilling. The elbow patches are the reason it lasted while cheaper hoodies did not.',
+      },
+      {
+        author: 'Ahmed F.',
+        rating: 5,
+        title: 'Room to grow',
+        body: 'Bought the 6Y for my four year old as advised and it works perfectly with the cuffs turned up.',
+      },
+    ],
   },
   {
     slug: 'coastal-linen-shirt',
@@ -130,6 +189,20 @@ const products: SeedProduct[] = [
     category: 'men',
     colors: ['olive', 'white'],
     sizes: ['S', 'M', 'L', 'XL'],
+    reviews: [
+      {
+        author: 'Khalid B.',
+        rating: 5,
+        title: 'Made a 44°C week bearable',
+        body: 'Genuinely breathable and it does not cling. Wrinkles, obviously — that is linen — but the wash gives it a relaxed look rather than a crumpled one.',
+      },
+      {
+        author: 'Tom W.',
+        rating: 4,
+        title: 'Great camp collar',
+        body: 'Sits flat and open the way it should. Sizing is generous in the body.',
+      },
+    ],
   },
   {
     slug: 'cable-knit-sweater',
@@ -146,6 +219,20 @@ const products: SeedProduct[] = [
     category: 'women',
     colors: ['oatmeal', 'charcoal'],
     sizes: ['XS', 'S', 'M', 'L'],
+    reviews: [
+      {
+        author: 'Hind A.',
+        rating: 5,
+        title: 'Heavy, warm, no bobbling',
+        body: 'Undyed lambswool means the oatmeal colour has real depth to it. Worn weekly since November with no pilling.',
+      },
+      {
+        author: 'Elena P.',
+        rating: 4,
+        title: 'Itchy for the first wear',
+        body: 'Softened up after one wear. The dropped shoulder is very relaxed, so size down if you do not want it oversized.',
+      },
+    ],
   },
   {
     slug: 'tailored-wool-trousers',
@@ -161,7 +248,27 @@ const products: SeedProduct[] = [
     category: 'women',
     colors: ['charcoal', 'navy'],
     sizes: ['XS', 'S', 'M', 'L'],
+    reviews: [
+      {
+        author: 'Reem T.',
+        rating: 5,
+        title: 'Side adjusters are the detail that wins',
+        body: 'No belt needed, and the high rise stays put when sitting. The drape of the wool is excellent for the price.',
+      },
+      {
+        author: 'Maya N.',
+        rating: 4,
+        title: 'Long in the leg',
+        body: 'I am 168cm and needed a 4cm hem. Otherwise a perfect fit through the waist and thigh.',
+      },
+    ],
   },
+]
+
+const coupons = [
+  { code: 'WELCOME10', percentOff: 10, active: true, usageLimit: null },
+  { code: 'ATELIER20', percentOff: 20, active: true, usageLimit: 100 },
+  { code: 'EXPIRED5', percentOff: 5, active: false, usageLimit: null },
 ]
 
 async function main() {
@@ -192,7 +299,40 @@ async function main() {
       colors: { connect: p.colors.map((slug) => ({ slug })) },
       sizes: { connect: p.sizes.map((label) => ({ label })) },
     }
-    await prisma.product.upsert({ where: { slug: p.slug }, update: data, create: { slug: p.slug, ...data } })
+
+    const product = await prisma.product.upsert({
+      where: { slug: p.slug },
+      update: data,
+      create: { slug: p.slug, ...data },
+    })
+
+    // Gallery: the main shot plus a fabric/detail shot, re-created on every run
+    // so the seed stays idempotent without needing a compound unique key.
+    await prisma.productImage.deleteMany({ where: { productId: product.id } })
+    await prisma.productImage.createMany({
+      data: [
+        { productId: product.id, url: p.imageUrl, alt: p.name, position: 0 },
+        {
+          productId: product.id,
+          url: p.imageUrl.replace(/\.jpg$/, '-detail.jpg'),
+          alt: `${p.name} — fabric detail`,
+          position: 1,
+        },
+      ],
+    })
+
+    await prisma.review.deleteMany({ where: { productId: product.id } })
+    await prisma.review.createMany({
+      data: p.reviews.map((review) => ({ ...review, productId: product.id })),
+    })
+  }
+
+  for (const coupon of coupons) {
+    await prisma.coupon.upsert({
+      where: { code: coupon.code },
+      update: coupon,
+      create: coupon,
+    })
   }
 
   // Demo accounts — passwords are hashed, never stored in plain text.
@@ -212,9 +352,10 @@ async function main() {
 
   const counts = {
     products: await prisma.product.count(),
+    images: await prisma.productImage.count(),
+    reviews: await prisma.review.count(),
+    coupons: await prisma.coupon.count(),
     categories: await prisma.category.count(),
-    colors: await prisma.color.count(),
-    sizes: await prisma.size.count(),
     users: await prisma.user.count(),
   }
   console.log('Seed complete:', counts)

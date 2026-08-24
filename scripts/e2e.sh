@@ -137,6 +137,51 @@ FINAL_STOCK=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new Da
 check "stock ends at 0, never negative" "0" "$FINAL_STOCK"
 node -e "const{DatabaseSync}=require('node:sqlite');new DatabaseSync('prisma/dev.db').prepare(\"UPDATE Product SET stock=76 WHERE slug='little-explorer-hoodie'\").run()" 2>/dev/null
 
+echo "=== GALLERY + REVIEWS ==="
+curl -s "$B/products/cable-knit-sweater" -o /tmp/pdp2.html
+check "PDP shows 2 gallery images" "2" "$(grep -o 'Show image [0-9]' /tmp/pdp2.html | sort -u | wc -l | tr -d ' ')"
+check "PDP embeds JSON-LD Product schema" "true" "$(grep -qF 'application/ld+json' /tmp/pdp2.html && grep -qF 'AggregateRating' /tmp/pdp2.html && echo true || echo false)"
+check "PDP lists seeded reviews" "true" "$(grep -qF 'Heavy, warm, no bobbling' /tmp/pdp2.html && echo true || echo false)"
+SWEATER=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(d.prepare(\"SELECT id FROM Product WHERE slug='cable-knit-sweater'\").get().id)" 2>/dev/null)
+check "POST review -> 201" "201" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/reviews -H 'Content-Type: application/json' -d "{\"productId\":\"$SWEATER\",\"author\":\"E2E Tester\",\"rating\":5,\"title\":\"Great knit\",\"body\":\"Arrived quickly and the wool is much softer than expected.\"}")"
+check "review body too short -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/reviews -H 'Content-Type: application/json' -d "{\"productId\":\"$SWEATER\",\"author\":\"E2E Tester\",\"rating\":5,\"body\":\"short\"}")"
+check "review rating 9 -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/reviews -H 'Content-Type: application/json' -d "{\"productId\":\"$SWEATER\",\"author\":\"E2E Tester\",\"rating\":9,\"body\":\"A perfectly reasonable length of review text.\"}")"
+check "review appears on the page" "true" "$(curl -s "$B/products/cable-knit-sweater" | grep -qF 'Great knit' && echo true || echo false)"
+
+echo "=== COUPONS ==="
+check "WELCOME10 valid (10% of 6400 = 640)" "640" "$(curl -s -X POST $B/api/coupons -H 'Content-Type: application/json' -d '{"code":"welcome10","subtotal":6400}' | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{process.stdout.write(String(JSON.parse(d).discount))}catch{process.stdout.write('ERR')}})")"
+check "unknown code -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/coupons -H 'Content-Type: application/json' -d '{"code":"NOPE","subtotal":6400}')"
+check "inactive code -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/coupons -H 'Content-Type: application/json' -d '{"code":"EXPIRED5","subtotal":6400}')"
+
+echo "=== ORDER WITH COUPON ==="
+USED_BEFORE=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT usedCount FROM Coupon WHERE code='WELCOME10'\").get().usedCount))" 2>/dev/null)
+curl -s -o /tmp/coupon-order.json -w "%{http_code}" -b /tmp/buyer.jar -X POST $B/api/orders -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"fullName\":\"Coupon Buyer\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"couponCode\":\"WELCOME10\",\"lines\":[{\"productId\":\"$TEEPID\",\"size\":\"M\",\"color\":\"White\",\"quantity\":2}]}" > /tmp/coupon-order.code
+check "order with coupon -> 201" "201" "$(cat /tmp/coupon-order.code)"
+check "total = 6400 - 640 + 695 shipping = 6455" "6455" "$(node -e "try{process.stdout.write(String(require('/tmp/coupon-order.json').total))}catch{process.stdout.write('ERR')}")"
+USED_AFTER=$(node -e "const{DatabaseSync}=require('node:sqlite');const d=new DatabaseSync('prisma/dev.db');process.stdout.write(String(d.prepare(\"SELECT usedCount FROM Coupon WHERE code='WELCOME10'\").get().usedCount))" 2>/dev/null)
+check "coupon usage counted ($USED_BEFORE -> $USED_AFTER)" "$((USED_BEFORE+1))" "$USED_AFTER"
+check "bogus coupon on order -> 422" "422" "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/api/orders -H 'Content-Type: application/json' -d "{\"email\":\"$EMAIL\",\"fullName\":\"C B\",\"address\":\"12 Test Street\",\"city\":\"Riyadh\",\"postcode\":\"12345\",\"country\":\"Saudi Arabia\",\"couponCode\":\"FAKECODE\",\"lines\":[{\"productId\":\"$TEEPID\",\"size\":\"M\",\"color\":\"White\",\"quantity\":1}]}")"
+
+echo "=== COMPARE / SEO / 404 / PAGINATION ==="
+curl -s "$B/compare?ids=$TEEPID,$SWEATER" -o /tmp/cmp.html
+check "/compare shows both products" "true" "$(grep -qF 'Essential Heavyweight Tee' /tmp/cmp.html && grep -qF 'Cable Knit Wool Sweater' /tmp/cmp.html && echo true || echo false)"
+check "/compare has the comparison rows" "true" "$(grep -qF 'Availability' /tmp/cmp.html && grep -qF 'Discount' /tmp/cmp.html && echo true || echo false)"
+check "/compare with no ids -> empty state" "true" "$(curl -s "$B/compare" | grep -qF 'Nothing selected yet' && echo true || echo false)"
+check "/sitemap.xml lists products" "true" "$(curl -s "$B/sitemap.xml" | grep -qF '/products/cable-knit-sweater' && echo true || echo false)"
+check "/robots.txt disallows /admin" "true" "$(curl -s "$B/robots.txt" | grep -qF '/admin' && echo true || echo false)"
+check "unknown page -> 404" "404" "$(curl -s -o /dev/null -w '%{http_code}' $B/this-page-does-not-exist)"
+check "404 page is the custom one" "true" "$(curl -s $B/this-page-does-not-exist | grep -qF 'This page has been discontinued' && echo true || echo false)"
+check "/catalog?page=1 -> 200" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$B/catalog?page=1")"
+check "catalog shows the range line" "true" "$(curl -s "$B/catalog" | grep -qF 'Showing 1' && echo true || echo false)"
+
+echo "=== ORDERS DASHBOARDS ==="
+curl -s -b /tmp/admin.jar -o /tmp/ao.html -w "%{http_code}" $B/admin/orders > /tmp/ao.code
+check "/admin/orders as admin -> 200" "200" "$(cat /tmp/ao.code)"
+check "admin orders table renders" "true" "$(grep -qF 'Coupon Buyer' /tmp/ao.html && grep -qF 'WELCOME10' /tmp/ao.html && echo true || echo false)"
+curl -s -c /tmp/cust.jar -o /dev/null -X POST $B/api/auth/login -H 'Content-Type: application/json' -d '{"email":"demo@store.test","password":"demo123"}'
+check "/account/orders as customer -> 200" "200" "$(curl -s -o /dev/null -w '%{http_code}' -b /tmp/cust.jar $B/account/orders)"
+check "/account/orders unauthenticated -> 307" "307" "$(curl -s -o /dev/null -w '%{http_code}' $B/account/orders)"
+
 echo "=== ADMIN: DELETE RULES ==="
 check "delete ordered product -> 409 (FK protected)" "409" \
   "$(curl -s -b /tmp/admin.jar -o /dev/null -w '%{http_code}' -X DELETE "$B/api/admin/products/$TEEPID")"

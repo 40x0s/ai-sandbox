@@ -24,6 +24,12 @@ export async function AccountNav() {
 
   return (
     <div className="flex items-center gap-3 pl-2">
+      <Link
+        href="/account/orders"
+        className="hidden text-sm text-ink-soft transition-colors hover:text-clay lg:inline"
+      >
+        Orders
+      </Link>
       {session.role === 'ADMIN' && (
         <Link
           href="/admin"

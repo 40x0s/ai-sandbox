@@ -34,6 +34,7 @@ export default async function EditProductPage({
             categoryId: product.categoryId,
             sizeLabels: product.sizes.map((size) => size.label),
             colorSlugs: product.colors.map((color) => color.slug),
+            imageUrls: product.images.filter((image) => image.position > 0).map((image) => image.url),
           }}
         />
       </div>

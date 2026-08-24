@@ -22,6 +22,7 @@ export type ProductDraft = {
   categoryId: string
   sizeLabels: string[]
   colorSlugs: string[]
+  imageUrls: string[]
 }
 
 type Props = {
@@ -50,6 +51,7 @@ export function ProductForm({ taxonomies, product }: Props) {
     product?.compareAtPrice ? String(product.compareAtPrice) : '',
   )
   const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? '/images/products/essential-tee.jpg')
+  const [imageUrls, setImageUrls] = useState<string[]>(product?.imageUrls ?? [])
   const [stock, setStock] = useState(product ? String(product.stock) : '10')
   const [featured, setFeatured] = useState(product?.featured ?? false)
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? taxonomies.categories[0]?.id ?? '')
@@ -78,6 +80,7 @@ export function ProductForm({ taxonomies, product }: Props) {
       price: Number(price),
       compareAtPrice: compareAtPrice === '' ? '' : Number(compareAtPrice),
       imageUrl,
+      imageUrls: imageUrls.filter((url) => url.trim().length > 0),
       stock: Number(stock),
       featured,
       categoryId,
@@ -227,6 +230,49 @@ export function ProductForm({ taxonomies, product }: Props) {
           </div>
         </div>
 
+        <fieldset>
+          <legend className={labelClass}>Gallery (extra images)</legend>
+          <div className="mt-3 space-y-2">
+            {imageUrls.map((url, index) => (
+              <div key={index} className="flex gap-2">
+                <input
+                  aria-label={`Gallery image ${index + 1}`}
+                  value={url}
+                  onChange={(event) =>
+                    setImageUrls((current) =>
+                      current.map((item, position) =>
+                        position === index ? event.target.value : item,
+                      ),
+                    )
+                  }
+                  className={`${inputClass} font-mono text-xs`}
+                  placeholder="/images/products/example.jpg"
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove gallery image ${index + 1}`}
+                  onClick={() =>
+                    setImageUrls((current) => current.filter((_, position) => position !== index))
+                  }
+                  className="shrink-0 border border-line px-3 text-sm transition-colors hover:border-clay hover:text-clay"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setImageUrls((current) => [...current, ''])}
+              className="border border-line px-4 py-2 text-xs tracking-[0.12em] uppercase transition-colors hover:border-ink"
+            >
+              + Add image
+            </button>
+            <p className="text-xs text-stone">
+              The main image is always first; these appear as thumbnails after it.
+            </p>
+          </div>
+        </fieldset>
+
         <div>
           <label htmlFor="categoryId" className={labelClass}>
             Category
@@ -323,7 +369,7 @@ export function ProductForm({ taxonomies, product }: Props) {
         </div>
       </div>
 
-      <aside className="h-fit border border-line bg-white/60 p-5 text-xs text-stone lg:sticky lg:top-8">
+      <aside className="h-fit border border-line bg-bone-100/60 p-5 text-xs text-stone lg:sticky lg:top-8">
         <p className="font-medium text-ink">Tips</p>
         <ul className="mt-3 space-y-2 leading-relaxed">
           <li>Prices are entered in dollars and stored as integer cents.</li>

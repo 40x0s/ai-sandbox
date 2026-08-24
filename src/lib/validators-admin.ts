@@ -13,6 +13,8 @@ export const productFormSchema = z.object({
   price: z.coerce.number().positive('Price must be greater than zero').max(100000),
   compareAtPrice: z.coerce.number().positive().max(100000).optional().or(z.literal('')),
   imageUrl: z.string().trim().min(1, 'Image URL is required').max(500),
+  /** Extra gallery shots; the main imageUrl is always position 0. */
+  imageUrls: z.array(z.string().trim().max(500)).default([]),
   stock: z.coerce.number().int().min(0, 'Stock cannot be negative').max(100000),
   featured: z.boolean().optional(),
   categoryId: z.string().min(1, 'Choose a category'),

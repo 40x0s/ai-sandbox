@@ -122,7 +122,7 @@ export function CartView() {
         </ul>
       </section>
 
-      <aside className="h-fit border border-line bg-white/60 p-6 lg:sticky lg:top-32">
+      <aside className="h-fit border border-line bg-bone-100/60 p-6 lg:sticky lg:top-32">
         <h2 className="text-sm font-medium tracking-[0.14em] uppercase">Order summary</h2>
 
         <dl className="mt-5 space-y-3 text-sm">

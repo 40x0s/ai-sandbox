@@ -8,15 +8,22 @@ Everything in the feature list below is implemented and verified end-to-end
 | Area | What's built |
 | --- | --- |
 | Landing page | Hero, promo banners, category strip, featured products, value props, scroll reveals |
-| Catalogue | `/catalog` with category / size / colour / price / sale filters + 5 sort modes — **filters apply instantly** and stay in the URL |
-| Product page | `/products/[slug]` with cursor-following image zoom, size & colour selectors, stock state, quantity, related products |
+| Catalogue | `/catalog` with category / size / colour / price / sale / keyword filters + 5 sort modes — **filters apply instantly** and stay in the URL — plus pagination |
+| Product page | Multi-image **gallery** with thumbnails + zoom, size & colour selectors, stock state, quantity, related products, **reviews**, JSON-LD structured data |
+| Reviews | Rating summary, distribution bars, seeded reviews, submit form (`POST /api/reviews`) that keeps the product average in sync |
 | Cart | Slide-over mini cart drawer, live header badge, toasts, quantity controls, free-shipping progress bar, `localStorage` persistence |
 | Quick add | Add to bag straight from a product card (size row appears in place) |
 | Live search | Debounced header search (`GET /api/products/search`) with thumbnails and keyboard navigation |
 | Favourites | Heart toggle on every product, persisted to `localStorage`, dropdown in the header |
+| Compare | Compare pill on cards, floating tray (max 4), `/compare` spec table |
+| Recently viewed | Per-visitor strip on product pages, persisted to `localStorage` |
+| Coupons | `WELCOME10` / `ATELIER20`, validated server-side, usage limits, applied on checkout |
+| Dark mode | Light/dark toggle, follows the OS preference, persisted, no flash on load |
 | Checkout | `/checkout` → `POST /api/orders` (server-side re-pricing + stock checks) → `/checkout/success` |
+| Orders | `/account/orders` for customers, `/admin/orders` for admins |
 | Auth | Register / login with bcrypt hashes and a signed `jose` JWT session cookie |
-| Admin | `/admin` product list, stats, create / edit / delete — behind an admin guard |
+| Admin | `/admin` product list + gallery editor, stats, create / edit / delete — behind an admin guard |
+| SEO | `sitemap.xml`, `robots.txt`, per-product JSON-LD, custom 404 |
 
 ---
 
@@ -34,6 +41,8 @@ npm run dev                 # → http://localhost:3000
 ```
 
 Sign in as `admin@store.test` / `admin123` to reach `/admin`.
+
+Seeded coupons: `WELCOME10` (10%), `ATELIER20` (20%, 100 uses), `EXPIRED5` (inactive).
 
 If `npm run db:setup` fails with an error mentioning **binaries.prisma.sh**, your network is
 blocking Prisma's engine download — use the fallback instead (same SQL, same result):
@@ -84,7 +93,7 @@ npm run dev                           # http://localhost:3000
 | `npm run db:studio` | Prisma Studio |
 | `npm run db:setup` | Migrate + seed |
 | `npm run db:setup:offline` | Same, but applies the committed SQL without the Prisma CLI |
-| `bash scripts/e2e.sh` | End-to-end smoke test against a running dev server |
+| `bash scripts/e2e.sh` | End-to-end smoke test — 67 assertions against a running dev server |
 
 ## 3. Demo accounts
 
@@ -97,13 +106,14 @@ The admin account is what unlocks `/admin`. Passwords are stored as bcrypt hashe
 
 ## 4. Routes
 
-**Storefront** — `/`, `/catalog`, `/products/[slug]`, `/cart`, `/checkout`, `/checkout/success`,
-`/login`, `/register`
+**Storefront** — `/`, `/catalog`, `/products/[slug]`, `/compare`, `/cart`, `/checkout`,
+`/checkout/success`, `/login`, `/register`, `/account/orders`, `sitemap.xml`, `robots.txt`
 
-**Admin (guarded)** — `/admin`, `/admin/products/new`, `/admin/products/[id]/edit`
+**Admin (guarded)** — `/admin`, `/admin/orders`, `/admin/products/new`, `/admin/products/[id]/edit`
 
-**API** — `POST /api/auth/{register,login,logout}` · `POST /api/orders` ·
-`POST /api/admin/products` · `PATCH|DELETE /api/admin/products/[id]`
+**API** — `POST /api/auth/{register,login,logout}` · `POST /api/orders` · `POST /api/reviews` ·
+`POST /api/coupons` · `GET /api/products/search` · `POST /api/admin/products` ·
+`PATCH|DELETE /api/admin/products/[id]`
 
 ## 5. Folder structure
 
@@ -128,21 +138,27 @@ src/
     api/auth/{register,login,logout}/   api/orders/   api/admin/products/[id]/
   components/
     home/       Hero, PromoBanners, CategoryStrip, FeaturedProducts, ValueProps
-    catalog/    FilterControls (instant, URL-synced), CatalogSearch, ActiveFilters, SortSelect
-    product/    ProductCard, ProductPurchase, QuickAdd, WishlistToggle, ZoomImage
+    catalog/    FilterControls (instant, URL-synced), CatalogSearch, ActiveFilters,
+                SortSelect, Pagination
+    product/    ProductCard, ProductGallery, ProductPurchase, QuickAdd, WishlistToggle,
+                CompareToggle, ReviewSection, ReviewForm, RecentlyViewed
     cart/       CartView
     checkout/   CheckoutForm
-    admin/      ProductForm, DeleteProductButton
+    admin/      ProductForm (incl. gallery editor), DeleteProductButton
     auth/       AuthForm
-    layout/     SiteHeader, AccountNav, BagButton, CartCount, CartDrawer, MobileMenu,
-                SearchBox, WishlistMenu, SignOutButton, SiteFooter, NewsletterForm
+    layout/     SiteHeader, AccountNav, BagButton, CartCount, CartDrawer, CompareTray,
+                MobileMenu, SearchBox, ThemeToggle, WishlistMenu, SignOutButton,
+                SiteFooter, NewsletterForm
     ui/         icons, Reveal
   lib/
     prisma.ts                    PrismaClient singleton + libsql driver adapter
-    products.ts  orders.ts  admin.ts      data-access layer (pages never call Prisma directly)
-    cart.tsx  wishlist.tsx       external stores (useSyncExternalStore + localStorage)
+    products.ts  orders.ts  admin.ts  coupons.ts   data-access layer (pages never
+                 call Prisma directly)
+    cart.tsx  wishlist.tsx  compare.tsx  recent.tsx  external stores
+                 (useSyncExternalStore + localStorage)
     ui.tsx                       cart drawer state, toast stack, scroll lock
     auth.ts                      JWT session: create / read / destroy / requireUser / requireAdmin
+    rate-limit.ts                fixed-window throttle for auth and reviews
     validators.ts  validators-admin.ts    zod schemas for every API payload
     catalog-params.ts            URL ⇄ filter-state parsing
     pricing.ts  format.ts        shipping rules, cents → currency
@@ -210,7 +226,7 @@ reason; regenerate it with `npm run db:generate` after schema changes.
 | 5 | **Email** | No order confirmation or password reset emails are sent. |
 | 6 | **Framing / CSP** | `X-Frame-Options` and a Content-Security-Policy are intentionally absent so the Arena preview iframe works. Add `X-Frame-Options: DENY` and a nonce-based CSP for a standalone deployment. |
 | 7 | **Rate limiting scope** | In-memory and per instance. Use Redis or an edge limiter for multi-instance deployments. |
-| 8 | **Automated tests** | Only `scripts/e2e.sh` (40 assertions over HTTP). Add unit tests and a CI pipeline. |
+| 8 | **Automated tests** | Only `scripts/e2e.sh` (67 assertions over HTTP). Add unit tests and a CI pipeline. |
 | 9 | **`NEXT_PUBLIC_SITE_URL`** | Set it to the real domain, otherwise Open Graph image URLs point at localhost. |
 | 10 | **Product images** | Served from `public/images`. Real catalogs need object storage + a CDN and an upload flow. |
 

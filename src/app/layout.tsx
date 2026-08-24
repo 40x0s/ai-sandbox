@@ -2,8 +2,11 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { CartProvider } from '@/lib/cart'
 import { WishlistProvider } from '@/lib/wishlist'
+import { CompareProvider } from '@/lib/compare'
+import { RecentProvider } from '@/lib/recent'
 import { Toaster, UiProvider } from '@/lib/ui'
 import { CartDrawer } from '@/components/layout/CartDrawer'
+import { CompareTray } from '@/components/layout/CompareTray'
 import { SiteHeader } from '@/components/layout/SiteHeader'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import './globals.css'
@@ -25,9 +28,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${GeistSans.variable} h-full`}>
+    <html lang="en" className={`${GeistSans.variable} h-full`} suppressHydrationWarning>
+      <head>
+        {/* Runs before first paint so dark mode never flashes white. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('atelier.theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="flex min-h-full flex-col antialiased">
         <UiProvider>
+          <CompareProvider>
+          <RecentProvider>
           <WishlistProvider>
             <CartProvider>
               <a
@@ -46,8 +59,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <SiteFooter />
             </CartProvider>
           </WishlistProvider>
+          </RecentProvider>
+          </CompareProvider>
 
           <CartDrawer />
+          <CompareTray />
           <Toaster />
         </UiProvider>
       </body>

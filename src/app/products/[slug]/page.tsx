@@ -5,7 +5,9 @@ import { discountPercent, formatPrice } from '@/lib/format'
 import { ProductPurchase } from '@/components/product/ProductPurchase'
 import { ProductCard } from '@/components/product/ProductCard'
 import { WishlistToggle } from '@/components/product/WishlistToggle'
-import { ZoomImage } from '@/components/product/ZoomImage'
+import { ProductGallery } from '@/components/product/ProductGallery'
+import { ReviewSection } from '@/components/product/ReviewSection'
+import { RecentlyViewed } from '@/components/product/RecentlyViewed'
 import { ReturnIcon, ShieldIcon, StarIcon, TruckIcon } from '@/components/ui/icons'
 
 export const dynamic = 'force-dynamic'
@@ -32,8 +34,47 @@ export default async function ProductPage({ params }: Props) {
   const related = await getRelatedProducts(product, 4)
   const discount = discountPercent(product.price, product.compareAtPrice)
 
+  // Structured data so search engines can show price, stock and rating.
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const averageRating =
+    product.reviews.length > 0
+      ? product.reviews.reduce((sum, review) => sum + review.rating, 0) / product.reviews.length
+      : product.rating
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    sku: product.slug,
+    description: product.description,
+    image: (product.images.length > 0 ? product.images.map((i) => i.url) : [product.imageUrl]).map(
+      (url) => `${base}${url}`,
+    ),
+    brand: { '@type': 'Brand', name: 'ATELIER' },
+    offers: {
+      '@type': 'Offer',
+      url: `${base}/products/${product.slug}`,
+      priceCurrency: 'USD',
+      price: (product.price / 100).toFixed(2),
+      availability:
+        product.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    },
+    ...(product.reviews.length > 0
+      ? {
+          aggregateRating: {
+            '@type': 'AggregateRating',
+            ratingValue: averageRating.toFixed(1),
+            reviewCount: product.reviews.length,
+          },
+        }
+      : {}),
+  }
+
   return (
     <div className="container-x px-4 py-8 sm:px-6 lg:px-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <nav aria-label="Breadcrumb" className="text-xs text-stone">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
@@ -56,11 +97,17 @@ export default async function ProductPage({ params }: Props) {
         {/* Gallery */}
         <div className="lg:sticky lg:top-32 lg:self-start">
           <div className="relative">
-            <ZoomImage
-              src={product.imageUrl}
-              alt={product.name}
-              width={1408}
-              height={768}
+            <ProductGallery
+              name={product.name}
+              images={
+                product.images.length > 0
+                  ? product.images.map((image) => ({
+                      id: image.id,
+                      url: image.url,
+                      alt: image.alt || product.name,
+                    }))
+                  : [{ id: 'main', url: product.imageUrl, alt: product.name }]
+              }
               badge={
                 discount ? (
                   <span className="absolute top-4 left-4 bg-clay px-3 py-1.5 text-[11px] tracking-[0.14em] text-bone uppercase">
@@ -81,7 +128,10 @@ export default async function ProductPage({ params }: Props) {
               />
             </div>
           </div>
-          <p className="mt-3 text-xs text-stone">Hover the image to zoom · tap the heart to save</p>
+          <p className="mt-3 text-xs text-stone">
+            {product.images.length > 1 ? `${product.images.length} images · ` : ''}hover to zoom ·
+            tap the heart to save
+          </p>
         </div>
 
         {/* Details */}
@@ -162,6 +212,25 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </section>
       )}
+
+      <ReviewSection
+        productId={product.id}
+        reviews={product.reviews}
+        average={
+          product.reviews.length > 0
+            ? product.reviews.reduce((sum, review) => sum + review.rating, 0) /
+              product.reviews.length
+            : product.rating
+        }
+      />
+
+      <RecentlyViewed
+        id={product.id}
+        slug={product.slug}
+        name={product.name}
+        imageUrl={product.imageUrl}
+        price={product.price}
+      />
     </div>
   )
 }

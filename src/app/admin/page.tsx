@@ -20,7 +20,7 @@ export default async function AdminProductsPage() {
     <>
       <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <div key={card.label} className="border border-line bg-white/60 p-5">
+          <div key={card.label} className="border border-line bg-bone-100/60 p-5">
             <dt className="eyebrow text-stone">{card.label}</dt>
             <dd className="mt-2 text-2xl font-semibold tabular-nums">{card.value}</dd>
           </div>

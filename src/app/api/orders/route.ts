@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import { checkoutSchema } from '@/lib/validators'
 import { shippingFor } from '@/lib/pricing'
+import { validateCoupon } from '@/lib/coupons'
 
 /**
  * Checkout simulation: validates the bag against the database, re-prices every
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { lines, ...customer } = parsed.data
+  const { lines, couponCode, ...customer } = parsed.data
 
   const productIds = [...new Set(lines.map((line) => line.productId))]
   const products = await prisma.product.findMany({ where: { id: { in: productIds } } })
@@ -48,8 +49,20 @@ export async function POST(request: Request) {
     (sum, line) => sum + (productById.get(line.productId)?.price ?? 0) * line.quantity,
     0,
   )
+  // Coupons are re-validated here — the client's discount is never trusted.
+  let discount = 0
+  let appliedCoupon: string | null = null
+  if (couponCode) {
+    const check = await validateCoupon(couponCode, subtotal)
+    if (!check.ok) {
+      return NextResponse.json({ error: check.error }, { status: 422 })
+    }
+    discount = check.discount
+    appliedCoupon = check.code
+  }
+
   const shipping = shippingFor(subtotal)
-  const total = subtotal + shipping
+  const total = subtotal - discount + shipping
 
   const session = await getSession()
 
@@ -60,6 +73,8 @@ export async function POST(request: Request) {
           ...customer,
           userId: session?.userId ?? null,
           subtotal,
+          discount,
+          couponCode: appliedCoupon,
           shipping,
           total,
           // Simulated payment: the order is considered paid immediately.
@@ -79,6 +94,13 @@ export async function POST(request: Request) {
           },
         },
       })
+
+      if (appliedCoupon) {
+        await tx.coupon.update({
+          where: { code: appliedCoupon },
+          data: { usedCount: { increment: 1 } },
+        })
+      }
 
       for (const line of lines) {
         // Conditional decrement: `stock >= quantity` is part of the WHERE, so if a
@@ -100,7 +122,10 @@ export async function POST(request: Request) {
       return created
     })
 
-    return NextResponse.json({ ok: true, orderId: order.id, total }, { status: 201 })
+    return NextResponse.json(
+      { ok: true, orderId: order.id, total, discount, couponCode: appliedCoupon },
+      { status: 201 },
+    )
   } catch (error) {
     if (error instanceof StockConflict) {
       return NextResponse.json({ error: error.message }, { status: 409 })

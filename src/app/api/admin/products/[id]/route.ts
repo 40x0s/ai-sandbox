@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession, validateTaxonomyRefs } from '@/lib/admin'
+import { getAdminSession, replaceGallery, validateTaxonomyRefs } from '@/lib/admin'
 import { productFormSchema } from '@/lib/validators-admin'
 
 type Context = { params: Promise<{ id: string }> }
@@ -48,6 +48,8 @@ export async function PATCH(request: Request, context: Context) {
       colors: { set: data.colorSlugs.map((slug) => ({ slug })) },
     },
   })
+
+  await replaceGallery(product.id, data.imageUrl, data.imageUrls)
 
   return NextResponse.json({ ok: true, product })
 }
