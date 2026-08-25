@@ -32,18 +32,6 @@ export default async function LoginPage({
         <div className="mt-8">
           <AuthForm mode="login" next={next} />
         </div>
-
-        <div className="mt-8 border-t border-line pt-6 text-xs text-stone">
-          <p className="font-medium text-ink-soft">Demo accounts</p>
-          <p className="mt-2">
-            Admin — <code className="font-mono">admin@store.test</code> /{' '}
-            <code className="font-mono">admin123</code>
-          </p>
-          <p className="mt-1">
-            Customer — <code className="font-mono">demo@store.test</code> /{' '}
-            <code className="font-mono">demo123</code>
-          </p>
-        </div>
       </div>
     </div>
   )
